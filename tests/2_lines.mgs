@@ -1,0 +1,12 @@
+# Points
+createPoint((1,2,5), "A")
+createPoint((3,1,0), "B")
+createPoint((-2,1,None), "C")
+createPoint((0,1,None), "D")
+# Lines
+createLine("A", "B", "m")
+createLine("C", "D", "k")
+# "_" on start of name means, that it is a construction line (has smaller width)
+createPoint((-2,None,1), "G")
+createPoint((0,None,4), "H")
+createLine("G", "H", "_k")

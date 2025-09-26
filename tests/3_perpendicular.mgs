@@ -1,0 +1,11 @@
+# Start condition
+createPoint((1,2,5), "A")
+createPoint((3,1,0), "B")
+createPoint((2,3,1), "K")
+createLine("A", "B", "c")
+# foot to line takes one point, line and in what quadrant it is
+footToLine("K", "c", "_K1", 1)
+footToLine("K", "c", "_K2", 2)
+# foot to line returns point that can be used to create a line
+createLine("_K1", "K", "_k1")
+createLine("_K2", "K", "_k2")

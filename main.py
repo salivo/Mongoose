@@ -1,38 +1,40 @@
-from typing import Dict
-import matplotlib.pyplot as plt
-
-from visualization import *
-from geometry_math import *
+import argparse
+import ast
+from visualization import DrawAxis, DrawPoint, DrawLine, DrawScene
+from geometry_math import Point, Line, foot_of_perp_2d
 
 points: dict[str, Point] = {}
 lines: dict[str, Line] = {}
 
-def createPoint(cords, name):
+
+def createPoint(cords: tuple[float, float, float], name: str):
     p = Point(cords, name)
     points[name] = p
     return p
 
-def createLine(p1_name, p2_name, name):
+
+def createLine(p1_name: str, p2_name: str, name: str, y: int = 0):
+    if y not in (0, 1, 2):
+        return
     p1 = points[p1_name]
     p2 = points[p2_name]
-    l = Line(p1, p2, name)
-    lines[name] = l
-    return l
+    line = Line(p1, p2, name, y)
+    lines[name] = line
+    return line
 
-def footToLine(point:str, line:str, new_name:str, y:int):
-    point_obj:Point = points[point[0]]
-    line_obj:Line = lines[line[0]]
+
+def footToLine(point: str, line: str, new_name: str, y: int):
+    point_obj: Point = points[point[0]]
+    line_obj: Line = lines[line[0]]
     if y not in (1, 2):
         return
     PointY = point_obj.y1 if y == 1 else point_obj.y2
     LineP1Y = line_obj.p1.y1 if y == 1 else line_obj.p1.y2
     LineP2Y = line_obj.p2.y1 if y == 1 else line_obj.p2.y2
-    if (None in (PointY, LineP1Y, LineP2Y)):
+    if None in (PointY, LineP1Y, LineP2Y):
         return
     foot_xy = foot_of_perp_2d(
-        (line_obj.p1.x, LineP1Y),
-        (line_obj.p2.x, LineP2Y),
-        (point_obj.x, PointY)
+        (line_obj.p1.x, LineP1Y), (line_obj.p2.x, LineP2Y), (point_obj.x, PointY)
     )
     if y == 1:
         NewPoint = Point((-foot_xy[0], -foot_xy[1], None), new_name)
@@ -41,28 +43,43 @@ def footToLine(point:str, line:str, new_name:str, y:int):
     points[new_name] = NewPoint
     return NewPoint
 
+
+COMMANDS = {
+    "createPoint": createPoint,
+    "createLine": createLine,
+    "footToLine": footToLine,
+}
+
+
 def load_scene(file_path: str):
     with open(file_path) as f:
         for line in f:
             line = line.strip()
             if not line or line.startswith("#"):
                 continue
-            exec(line, globals())
+
+            # Split function and arguments
+            func_name, arg_str = line.split("(", 1)
+            func_name = func_name.strip()
+            arg_str = arg_str.rstrip(")")
+
+            if func_name not in COMMANDS:
+                raise ValueError(f"Unknown command: {func_name}")
+
+            # Parse args safely
+            args = ast.literal_eval(f"({arg_str},)")  # pyright: ignore[reportAny]
+            _ = COMMANDS[func_name](*args)  # pyright: ignore[reportAny]
+
 
 if __name__ == "__main__":
-    # Draw axes
-    plt.axhline(0, color='black', linewidth=0.8)
-    plt.axvline(0, color='black', linewidth=0.8)
+    parser = argparse.ArgumentParser(description="Process a file path.")
+    _ = parser.add_argument("file", help="Path to the input file")
+    args = parser.parse_args()
+    load_scene(args.file)  # pyright: ignore[reportAny]
+    DrawAxis()
+    for point in points.values():
+        DrawPoint(point)
 
-    # Load scene commands from file
-    load_scene("scene.mgs")
-
-    # Draw all objects
-    for p in points.values():
-        DrawPoint(p)
-
-    for l in lines.values():
-        DrawLine(l)
-
-    plt.axis("equal")
-    plt.show()
+    for line in lines.values():
+        DrawLine(line)
+    DrawScene()
