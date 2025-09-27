@@ -1,0 +1,5 @@
+createPoint((1,2,3), "S")
+createPoint((-5,None,4), "D")
+createCircle("S1", 4, "k1")
+createCircle("S2", 4, "k2")
+createCircle("D2", 4, "d2")

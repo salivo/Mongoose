@@ -1,0 +1,23 @@
+# Start condition
+createPoint((1,2,5), "A")
+createPoint((3,1,0), "B")
+createPoint((2,3,1), "K")
+
+createLine("A1", "B1", "c1")
+createLine("A2", "B2", "c2")
+
+
+# foot to line takes one point, line and in what quadrant it is
+footToLine("K1", "c1", "N1")
+footToLine("K2", "c2", "L2",)
+
+# foot to line returns point that can be used to create a line
+createLine("K1", "N1", "_k1")
+createLine("K2", "L2", "_k2")
+
+
+# create perpendicular line from point to line
+createPerpFromPoint("A1", "c1", -1.0, "J1")
+createPerpFromPoint("A2", "c2", 1.0, "N2")
+createPerpFromPoint("A2", "c2", -2, "R2")
+createLine("N2", "R2", "_b2")

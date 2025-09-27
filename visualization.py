@@ -1,27 +1,14 @@
 # pyright: basic
 # ruff: noqa
+from matplotlib.patches import Circle as CirclePatch
 import matplotlib.pyplot as plt
 from geometry_math import *
 
 
 def DrawPoint(point: Point, color="blue"):
-    show_name = not point.name.startswith("_")
-
-    if point.y1 == point.y2 and point.y1 is not None:
-        plt.scatter(point.x, point.y1, color=color)
-        if show_name:
-            plt.text(point.x + 0.02, point.y1 + 0.1, point.name + "₁,₂", color=color)
-        return
-
-    if point.y1 is not None:
-        plt.scatter(point.x, point.y1, color=color)
-        if show_name:
-            plt.text(point.x + 0.02, point.y1 + 0.1, point.name + "₁", color=color)
-
-    if point.y2 is not None:
-        plt.scatter(point.x, point.y2, color=color)
-        if show_name:
-            plt.text(point.x + 0.02, point.y2 + 0.1, point.name + "₂", color=color)
+    plt.scatter(point.x, point.y, color=color)
+    if not point.name.startswith("_"):
+        plt.text(point.x + 0.02, point.y + 0.1, point.name, color=color)
 
 
 def DrawLine(line: Line, color="black"):
@@ -32,36 +19,19 @@ def DrawLine(line: Line, color="black"):
     if line.name.endswith(")"):
         width = 0.5
         style = "--"
-    if line.p1.y1 is not None and line.p2.y1 is not None:
-        if line.y_active in (0, 1):
-            plt.plot(
-                [line.p1.x, line.p2.x],
-                [line.p1.y1, line.p2.y1],
-                color=color,
-                linestyle=style,
-                linewidth=width,
-            )
-    if line.p1.y2 is not None and line.p2.y2 is not None:
-        if (line.p1.y1 != line.p1.y2) or (line.p2.y1 != line.p2.y2):
-            if line.y_active in (0, 2):
-                plt.plot(
-                    [line.p1.x, line.p2.x],
-                    [line.p1.y2, line.p2.y2],
-                    color=color,
-                    linestyle=style,
-                    linewidth=width,
-                )
+    plt.plot(
+        [line.p1.x, line.p2.x],
+        [line.p1.y, line.p2.y],
+        color=color,
+        linestyle=style,
+        linewidth=width,
+    )
 
 
-# def DrawPlane(point: Plane, color="green"):
-#     plt.scatter(point.x, 0, color=color)
-#     plt.text(point.x + 0.02, 0.1, point.name + "₀", color=color)
-
-#     plt.scatter(0, point.y1, color=color)
-#     plt.text(0 + 0.02, point.y1 + 0.1, point.name + "₁", color=color)
-
-#     plt.scatter(0, point.y2, color=color)
-#     plt.text(0.02, point.y2 + 0.1, point.name + "₂", color=color)
+def DrawCircle(circle: Circle, color="blue"):
+    plt.gca().add_patch(
+        CirclePatch((circle.center.x, circle.center.y), circle.radius, fill=False)
+    )
 
 
 def DrawAxis():
@@ -70,6 +40,16 @@ def DrawAxis():
     _ = plt.text(0.03, -0.15, "0₁,₂", color="black")  # pyright: ignore[reportUnknownMemberType]
 
 
-def DrawScene():
+def DrawScene(objects: dict[str, Point | Line | Circle]):
+    for obj in objects:
+        obj = objects.get(obj)
+        match obj:
+            case Point():
+                DrawPoint(obj)
+            case Line():
+                DrawLine(obj)
+            case Circle():
+                DrawCircle(obj)
+
     plt.axis("equal")
     plt.show()
