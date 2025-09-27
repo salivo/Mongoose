@@ -40,3 +40,23 @@ def foot_of_perp_2d(
     t = np.dot(k_arr - a_arr, v) / vv  # pyright: ignore[reportAny]
     foot = a_arr + t * v  # pyright: ignore[reportAny]
     return tuple(foot)  # pyright: ignore[reportAny]
+
+
+def intersect_2d(
+    A1: tuple[float, float],
+    A2: tuple[float, float],
+    B1: tuple[float, float],
+    B2: tuple[float, float],
+) -> tuple[float, float] | None:
+    x1, y1 = A1
+    x2, y2 = A2
+    x3, y3 = B1
+    x4, y4 = B2
+
+    denom = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4)
+    if denom == 0:  # Lines are parallel
+        return None
+
+    px = ((x1 * y2 - y1 * x2) * (x3 - x4) - (x1 - x2) * (x3 * y4 - y3 * x4)) / denom
+    py = ((x1 * y2 - y1 * x2) * (y3 - y4) - (y1 - y2) * (x3 * y4 - y3 * x4)) / denom
+    return px, py

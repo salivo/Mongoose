@@ -1,7 +1,7 @@
 import argparse
 import ast
 from visualization import DrawAxis, DrawPoint, DrawLine, DrawScene
-from geometry_math import Point, Line, foot_of_perp_2d
+from geometry_math import Point, Line, foot_of_perp_2d, intersect_2d
 
 points: dict[str, Point] = {}
 lines: dict[str, Line] = {}
@@ -44,10 +44,45 @@ def footToLine(point: str, line: str, new_name: str, y: int):
     return NewPoint
 
 
+def intersect(line1_name: str, line2_name: str, new_name: str, y: int = 1):
+    if y not in (1, 2):
+        raise ValueError("y must be 1 or 2")
+
+    L1 = lines[line1_name]
+    L2 = lines[line2_name]
+
+    # Choose the branch
+    yattr = "y1" if y == 1 else "y2"
+    A1 = (L1.p1.x, getattr(L1.p1, yattr))
+    A2 = (L1.p2.x, getattr(L1.p2, yattr))
+    B1 = (L2.p1.x, getattr(L2.p1, yattr))
+    B2 = (L2.p2.x, getattr(L2.p2, yattr))
+
+    # Check for None coordinates
+    if None in (A1[1], A2[1], B1[1], B2[1]):
+        # Intersection skipped: missing y coordinates
+        return None
+
+    xy = intersect_2d(A1, A2, B1, B2)
+    if xy is None:
+        # Lines are parallel — no intersection.
+        return None
+
+    x, y_val = xy
+    if y == 1:
+        pt = Point((-x, -y_val, None), new_name)
+    else:
+        pt = Point((-x, None, y_val), new_name)
+
+    points[new_name] = pt
+    return pt
+
+
 COMMANDS = {
     "createPoint": createPoint,
     "createLine": createLine,
     "footToLine": footToLine,
+    "intersect": intersect,
 }
 
 
