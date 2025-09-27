@@ -1,3 +1,4 @@
+from math import sqrt
 import numpy as np
 
 
@@ -60,3 +61,23 @@ def intersect_2d(
     px = ((x1 * y2 - y1 * x2) * (x3 - x4) - (x1 - x2) * (x3 * y4 - y3 * x4)) / denom
     py = ((x1 * y2 - y1 * x2) * (y3 - y4) - (y1 - y2) * (x3 * y4 - y3 * x4)) / denom
     return px, py
+
+
+def perpendicular_point_from_distance(
+    P: tuple[float, float],
+    A: tuple[float, float],
+    B: tuple[float, float],
+    distance: float,
+) -> tuple[float, float] | None:
+    vx = B[0] - A[0]
+    vy = B[1] - A[1]
+
+    # perpendicular vector
+    perp = (-vy, vx)
+    norm = sqrt(perp[0] ** 2 + perp[1] ** 2)
+    if norm == 0:
+        return None
+
+    perp_unit = (perp[0] / norm, perp[1] / norm)
+
+    return (P[0] + distance * perp_unit[0], P[1] + distance * perp_unit[1])

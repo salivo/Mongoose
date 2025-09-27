@@ -26,15 +26,19 @@ def DrawPoint(point: Point, color="blue"):
 
 def DrawLine(line: Line, color="black"):
     width = 1
+    style = "-"
     if line.name.startswith("_"):
         width = 0.5
+    if line.name.endswith(")"):
+        width = 0.5
+        style = "--"
     if line.p1.y1 is not None and line.p2.y1 is not None:
         if line.y_active in (0, 1):
             plt.plot(
                 [line.p1.x, line.p2.x],
                 [line.p1.y1, line.p2.y1],
                 color=color,
-                linestyle="-",
+                linestyle=style,
                 linewidth=width,
             )
     if line.p1.y2 is not None and line.p2.y2 is not None:
@@ -44,7 +48,7 @@ def DrawLine(line: Line, color="black"):
                     [line.p1.x, line.p2.x],
                     [line.p1.y2, line.p2.y2],
                     color=color,
-                    linestyle="-",
+                    linestyle=style,
                     linewidth=width,
                 )
 

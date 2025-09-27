@@ -1,7 +1,16 @@
 import argparse
 import ast
+import math
+import traceback
+from types import NoneType
 from visualization import DrawAxis, DrawPoint, DrawLine, DrawScene
-from geometry_math import Point, Line, foot_of_perp_2d, intersect_2d
+from geometry_math import (
+    Point,
+    Line,
+    foot_of_perp_2d,
+    intersect_2d,
+    perpendicular_point_from_distance,
+)
 
 points: dict[str, Point] = {}
 lines: dict[str, Line] = {}
@@ -78,32 +87,69 @@ def intersect(line1_name: str, line2_name: str, new_name: str, y: int = 1):
     return pt
 
 
-COMMANDS = {
+def createPerpFromPoint(
+    point_name: str, line_name: str, distance: float, new_point_name: str, y: int = 1
+) -> Point | None:
+    if y not in (1, 2):
+        raise ValueError("y must be 1 or 2")
+
+    base_pt = points[point_name]
+    ref_line = lines[line_name]
+
+    yattr = "y1" if y == 1 else "y2"
+    A = (ref_line.p1.x, getattr(ref_line.p1, yattr))
+    B = (ref_line.p2.x, getattr(ref_line.p2, yattr))
+    P = (base_pt.x, getattr(base_pt, yattr))
+
+    if None in (A[1], B[1], P[1]):
+        # Cannot create perpendicular from point — missing y values
+        return None
+
+    xy = perpendicular_point_from_distance(P, A, B, distance)
+    if xy is None:
+        # Line is degenerate; perpendicular not created
+        return None
+    x, y_val = xy
+    if y == 1:
+        new_pt = Point((-x, -y_val, None), new_point_name)
+    else:
+        new_pt = Point((-x, None, y_val), new_point_name)
+    points[new_point_name] = new_pt
+    return new_pt
+
+
+def getPoint(name: str) -> Point | None:
+    return points.get(name)
+
+
+safe_commands = {
     "createPoint": createPoint,
     "createLine": createLine,
     "footToLine": footToLine,
     "intersect": intersect,
+    "createPerpFromPoint": createPerpFromPoint,
+    "getPoint": getPoint,
+    "points": points,
+    "lines": lines,
 }
 
 
 def load_scene(file_path: str):
     with open(file_path) as f:
-        for line in f:
-            line = line.strip()
-            if not line or line.startswith("#"):
-                continue
-
-            # Split function and arguments
-            func_name, arg_str = line.split("(", 1)
-            func_name = func_name.strip()
-            arg_str = arg_str.rstrip(")")
-
-            if func_name not in COMMANDS:
-                raise ValueError(f"Unknown command: {func_name}")
-
-            # Parse args safely
-            args = ast.literal_eval(f"({arg_str},)")  # pyright: ignore[reportAny]
-            _ = COMMANDS[func_name](*args)  # pyright: ignore[reportAny]
+        code = f.read()
+    try:
+        exec(code, {"__builtins__": None}, safe_commands)
+    except Exception as e:
+        tb_list = traceback.extract_tb(e.__traceback__)
+        # find the last frame that belongs to the user's file
+        user_frame = None
+        for tb in tb_list:
+            if tb.filename == "<string>":
+                user_frame = tb
+        if user_frame:
+            print(f"Not allowed command on line {user_frame.lineno} in {file_path}")
+        else:
+            print(f"Error loading scene: {e}")
 
 
 if __name__ == "__main__":
