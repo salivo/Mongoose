@@ -12,6 +12,8 @@ def DrawPoint(point: Point, color="blue"):
 
 
 def DrawLine(line: Line, color="black"):
+    if line.name == "org_x":
+        return
     width = 1
     style = "-"
     if line.name.startswith("_"):

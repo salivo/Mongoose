@@ -1,4 +1,5 @@
 from math import sqrt
+import math
 import numpy as np
 
 
@@ -17,7 +18,7 @@ class Line:
 
 
 class Circle:
-    def __init__(self, center: Point, radius: float, name: str, y_active: int = 0):
+    def __init__(self, center: Point, radius: float, name: str):
         self.center: Point = center
         self.name: str = name
         self.radius: float = radius
@@ -164,3 +165,32 @@ def intersect_circle2circle(
         return Point((-px, py), name)
 
     return None
+
+
+def parallel_point_by_distance(
+    base_point: Point, line_parallel_to: Line, distance: float, name: str
+) -> Point:
+    vx = line_parallel_to.p2.x - line_parallel_to.p1.x
+    vy = line_parallel_to.p2.y - line_parallel_to.p1.y
+    norm = sqrt(vx * vx + vy * vy)
+    if norm == 0:
+        raise ValueError("Reference line has zero length")
+    ux, uy = vx / norm, vy / norm  # unit vector along the line
+    return Point((-base_point.x - distance * ux, base_point.y + distance * uy), name)
+
+
+def parallel_point_by_line(
+    base_point: Point, line_parallel_to: Line, line_to: Line, name: str
+) -> Point | None:
+    dx = line_parallel_to.p2.x - line_parallel_to.p1.x
+    dy = line_parallel_to.p2.y - line_parallel_to.p1.y
+    if dx == 0 and dy == 0:
+        raise ValueError("line_parallel_to cannot be degenerate")
+
+    parallel_line = Line(
+        base_point,
+        Point((-base_point.x - dx, base_point.y + dy), name + "_dir"),
+        "temp_parallel",
+    )
+
+    return intersect_line2line(parallel_line, line_to, name)

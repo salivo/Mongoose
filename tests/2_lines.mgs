@@ -13,3 +13,7 @@ createPoint((0,None,4), "H")
 createLine("G2", "H2", "_k")
 # ")" on the end of name means, that it is a real size line (has dashed style)
 createLine("A2", "D1", "(m)")
+
+# Also to simplyfy creation of planes (three points and two lines) we can simply do this
+createPlane((7,4.5,7), "rho")
+# then we can use it lines with rho1 and rho2

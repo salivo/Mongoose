@@ -9,6 +9,8 @@ from geometry_math import (
     intersect_circle2circle,
     intersect_circle2line,
     intersect_line2line,
+    parallel_point_by_distance,
+    parallel_point_by_line,
     perpendicular_point_from_distance,
 )
 
@@ -37,6 +39,16 @@ def createCircle(p_name: str, radius: float, name: str):
     if type(p) is Point:
         circle = Circle(p, radius, name)
         objects[name] = circle
+
+
+def createPlane(cords: tuple[float, float, float], name: str):
+    p0 = Point((cords[0], 0), "_P" + name + "0")
+    p1 = Point((0, -cords[1]), "_P" + name + "1")
+    p2 = Point((0, cords[2]), "_P" + name + "2")
+    line1 = Line(p0, p1, name + "1")
+    line2 = Line(p0, p2, name + "2")
+    objects[name + "1"] = line1
+    objects[name + "2"] = line2
 
 
 def footToLine(point: str, line: str, name: str):
@@ -79,12 +91,32 @@ def intersect(obj1: str, obj2: str, name: str, n: int = 1):
     objects[name] = p
 
 
+def parallel(base_point: str, line_parallel_to: str, offset: str | int, name: str):
+    p = objects[base_point]
+    line = objects[line_parallel_to]
+    if not isinstance(p, Point) or not isinstance(line, Line):
+        return
+    if isinstance(offset, str):
+        lineto = objects[offset]
+        if isinstance(lineto, Line):
+            result = parallel_point_by_line(p, line, lineto, name)
+            if result is None:
+                return
+            objects[name] = result
+    else:
+        objects[name] = parallel_point_by_distance(p, line, offset, name)
+
+
+objects["org_x"] = Line(Point((-10, 0), "ORG_X_1"), Point((10, 0), "ORG_X_1"), "org_x")
+
 safe_commands = {
     "createPoint": createPoint,
     "createLine": createLine,
     "createCircle": createCircle,
+    "createPlane": createPlane,
     "footToLine": footToLine,
     "intersect": intersect,
+    "parallel": parallel,
     "createPerpFromPoint": createPerpFromPoint,
     "objects": objects,
 }

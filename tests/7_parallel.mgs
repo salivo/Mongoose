@@ -1,0 +1,15 @@
+createPoint((1,2,5), "A")
+createPoint((3,1,0), "B")
+createLine("A1", "B1", "m1")
+createLine("A2", "B2", "m2")
+
+createPoint((0,2,3), "P")
+
+# parallel receives base point, parallel line, distance, name of created point
+parallel("P1", "m1", "org_x", "Z1")
+# or it can receive lineto instead of distance
+parallel("P2", "m2", 2, "Y2")
+# org_x is the base line
+
+createLine("P1", "Z1", "z1")
+createLine("P2", "Y2", "y2")
