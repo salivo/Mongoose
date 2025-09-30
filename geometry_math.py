@@ -1,5 +1,4 @@
 from math import sqrt
-import math
 import numpy as np
 
 
@@ -22,6 +21,16 @@ class Circle:
         self.center: Point = center
         self.name: str = name
         self.radius: float = radius
+
+
+class Plane:
+    def __init__(self, cords: tuple[float, float, float], name: str):
+        self.p0: Point = Point((cords[0], 0), "_P" + name + "0")
+        self.p1: Point = Point((0, -cords[1]), "_P" + name + "1")
+        self.p2: Point = Point((0, cords[2]), "_P" + name + "2")
+        self.line1: Line = Line(self.p0, self.p1, name + "1")
+        self.line2: Line = Line(self.p0, self.p2, name + "2")
+        self.name: str = name
 
 
 def foot_of_perp(line: Line, point: Point, name: str) -> Point:

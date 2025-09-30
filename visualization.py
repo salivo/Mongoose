@@ -12,7 +12,7 @@ def DrawPoint(point: Point, color="blue"):
 
 
 def DrawLine(line: Line, color="black"):
-    if line.name == "org_x":
+    if line.name in ("org_x", "org_y"):
         return
     width = 1
     style = "-"
@@ -42,7 +42,7 @@ def DrawAxis():
     _ = plt.text(0.03, -0.15, "0₁,₂", color="black")  # pyright: ignore[reportUnknownMemberType]
 
 
-def DrawScene(objects: dict[str, Point | Line | Circle]):
+def DrawScene(objects: dict[str, Point | Line | Circle | Plane]):
     for obj in objects:
         obj = objects.get(obj)
         match obj:

@@ -4,6 +4,7 @@ createPoint((1,2,5), "B")
 createLine("A1", "B1", "c1")
 createLine("A2", "B2", "c2")
 
+# With objects you can gen any property of any line, point, etc.
 d = objects["B1"].y - objects["A1"].y
 createPerpFromPoint("B2", "c2", d, "(B)")
 

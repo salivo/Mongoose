@@ -1,0 +1,10 @@
+createPoint((1,3.5,None), "A")
+createPoint((0,None,3.5), "B")
+
+createPlane((7,4.5,7), "rho")
+
+# The most common operation with planes is find second projection of a point which is in the plane
+# To do that just simply do:
+findPointWithPlane("A1", "rho")
+# also for point in another quadrant
+findPointWithPlane("B2", "rho")

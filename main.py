@@ -2,6 +2,7 @@ import argparse
 import traceback
 from visualization import DrawAxis, DrawScene
 from geometry_math import (
+    Plane,
     Point,
     Line,
     Circle,
@@ -14,7 +15,10 @@ from geometry_math import (
     perpendicular_point_from_distance,
 )
 
-objects: dict[str, Point | Line | Circle] = {}
+objects: dict[str, Point | Line | Circle | Plane] = {}
+
+org_x: Line = Line(Point((-10, 0), "ORG_X_1"), Point((10, 0), "ORG_X_1"), "org_x")
+org_y: Line = Line(Point((0, -10), "ORG_Y_1"), Point((0, 10), "ORG_Y_1"), "org_y")
 
 
 def createPoint(cords: tuple[float, float | None, float | None], name: str):
@@ -42,13 +46,10 @@ def createCircle(p_name: str, radius: float, name: str):
 
 
 def createPlane(cords: tuple[float, float, float], name: str):
-    p0 = Point((cords[0], 0), "_P" + name + "0")
-    p1 = Point((0, -cords[1]), "_P" + name + "1")
-    p2 = Point((0, cords[2]), "_P" + name + "2")
-    line1 = Line(p0, p1, name + "1")
-    line2 = Line(p0, p2, name + "2")
-    objects[name + "1"] = line1
-    objects[name + "2"] = line2
+    plane = Plane(cords, name)
+    objects[name] = plane
+    objects[name + "1"] = plane.line1
+    objects[name + "2"] = plane.line2
 
 
 def footToLine(point: str, line: str, name: str):
@@ -107,7 +108,44 @@ def parallel(base_point: str, line_parallel_to: str, offset: str | int, name: st
         objects[name] = parallel_point_by_distance(p, line, offset, name)
 
 
-objects["org_x"] = Line(Point((-10, 0), "ORG_X_1"), Point((10, 0), "ORG_X_1"), "org_x")
+def findPointWithPlane(point: str, plane: str):
+    if point not in objects or plane not in objects:
+        return
+    pointobj = objects[point]
+    planeobj = objects[plane]
+    if not isinstance(pointobj, Point) or not isinstance(planeobj, Plane):
+        return
+    newname = pointobj.name
+
+    p1 = parallel_point_by_line(pointobj, org_y, org_x, "")
+    if p1 is None:
+        return
+
+    if pointobj.name.endswith("1"):
+        newname = pointobj.name[:-1] + "2"
+        p2 = parallel_point_by_line(pointobj, planeobj.line1, org_x, "")
+        if p2 is None:
+            return
+        p3 = parallel_point_by_line(p2, org_y, planeobj.line2, "")
+
+    elif pointobj.name.endswith("2"):
+        newname = pointobj.name[:-1] + "1"
+        p2 = parallel_point_by_line(pointobj, planeobj.line2, org_x, "")
+        if p2 is None:
+            return
+        p3 = parallel_point_by_line(p2, org_y, planeobj.line1, "")
+    else:
+        raise ValueError(f"Name {pointobj.name} has no 1/2 suffix")
+    if not p3:
+        return
+    result = parallel_point_by_line(p3, org_x, Line(pointobj, p1, ""), newname)
+    if result is None:
+        return
+    objects[newname] = result
+
+
+objects["org_x"] = org_x
+objects["org_y"] = org_y
 
 safe_commands = {
     "createPoint": createPoint,
@@ -118,6 +156,7 @@ safe_commands = {
     "intersect": intersect,
     "parallel": parallel,
     "createPerpFromPoint": createPerpFromPoint,
+    "findPointWithPlane": findPointWithPlane,
     "objects": objects,
 }
 
