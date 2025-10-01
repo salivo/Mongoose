@@ -22,8 +22,14 @@ def DrawLine(line: Line, color="black"):
         width = 0.5
         style = "--"
     plt.plot(
-        [line.p1.x, line.p2.x],
-        [line.p1.y, line.p2.y],
+        [
+            line.p1.x - (line.p2.x - line.p1.x) * (line.resize[0] - 1),
+            line.p2.x + (line.p2.x - line.p1.x) * (line.resize[1] - 1),
+        ],
+        [
+            line.p1.y - (line.p2.y - line.p1.y) * (line.resize[0] - 1),
+            line.p2.y + (line.p2.y - line.p1.y) * (line.resize[1] - 1),
+        ],
         color=color,
         linestyle=style,
         linewidth=width,

@@ -14,6 +14,8 @@ class Line:
         self.p1: Point = p1
         self.p2: Point = p2
         self.name: str = name
+        self.type: str = "construct"
+        self.resize: tuple[float, float] = (1.0, 1.0)
 
 
 class Circle:
