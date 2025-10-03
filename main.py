@@ -1,6 +1,11 @@
 import argparse
+import atexit
 import traceback
-from visualization import DrawAxis, DrawScene
+from typing import cast, override
+from watchdog.events import FileSystemEvent, FileSystemEventHandler
+from watchdog.observers import Observer
+from watchdog.observers.api import BaseObserver
+from visualization import Visualization
 from geometry_math import (
     Plane,
     Point,
@@ -144,9 +149,6 @@ def findPointWithPlane(point: str, plane: str):
     objects[newname] = result
 
 
-objects["org_x"] = org_x
-objects["org_y"] = org_y
-
 safe_commands = {
     "createPoint": createPoint,
     "createLine": createLine,
@@ -162,6 +164,9 @@ safe_commands = {
 
 
 def load_scene(file_path: str):
+    objects.clear()
+    objects["org_x"] = org_x
+    objects["org_y"] = org_y
     with open(file_path) as f:
         code = f.read()
     try:
@@ -179,10 +184,34 @@ def load_scene(file_path: str):
             print(f"Error loading scene: {e}")
 
 
+class ObserverHandler(FileSystemEventHandler):
+    def __init__(self, path: str):
+        self.path: str = path
+
+    @override
+    def on_modified(self, event: FileSystemEvent):
+        if self.path == event.src_path:
+            print(f"File modified: {event.src_path}")
+            load_scene(file_path)
+            visual.drawScene(objects)
+
+
+def close(observer: BaseObserver) -> None:
+    observer.stop()
+    observer.join()
+
+
 if __name__ == "__main__":
+    visual = Visualization()
     parser = argparse.ArgumentParser(description="Process a file path.")
     _ = parser.add_argument("file", help="Path to the input file")
     args = parser.parse_args()
-    load_scene(args.file)  # pyright: ignore[reportAny]
-    DrawAxis()
-    DrawScene(objects)
+    file_path = cast(str, args.file)
+    observer = Observer()
+    handler = ObserverHandler(file_path)
+    _ = observer.schedule(handler, file_path, recursive=True)
+    observer.start()
+    _ = atexit.register(close, observer)
+    load_scene(file_path)
+    visual.drawScene(objects)
+    visual.sceneLoop()
