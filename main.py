@@ -1,5 +1,6 @@
 import argparse
 import atexit
+from math import degrees
 import traceback
 from typing import cast, override
 from watchdog.events import FileSystemEvent, FileSystemEventHandler
@@ -11,6 +12,7 @@ from geometry_math import (
     Point,
     Line,
     Circle,
+    angle_to_horizontal,
     foot_of_perp,
     intersect_circle2circle,
     intersect_circle2line,
@@ -23,7 +25,9 @@ from geometry_math import (
 objects: dict[str, Point | Line | Circle | Plane] = {}
 
 org_x: Line = Line(Point((-10, 0), "ORG_X_1"), Point((10, 0), "ORG_X_1"), "org_x")
+org_x.type = "none"
 org_y: Line = Line(Point((0, -10), "ORG_Y_1"), Point((0, 10), "ORG_Y_1"), "org_y")
+org_y.type = "none"
 
 
 def createPoint(cords: tuple[float, float | None, float | None], name: str):
@@ -55,6 +59,36 @@ def createPlane(cords: tuple[float, float, float], name: str):
     objects[name] = plane
     objects[name + "1"] = plane.line1
     objects[name + "2"] = plane.line2
+
+
+def setType(obj: str, line_type: str):
+    object = objects[obj]
+    if type(object) is not Circle and type(object) is not Line:
+        return
+    object.type = line_type
+
+
+def setStyle(obj: str, line_style: str):
+    object = objects[obj]
+    if type(object) is not Circle and type(object) is not Line:
+        return
+    object.style = line_style
+
+
+def setCircleDrawRange(circle: str, point_from: str, point_to: str):
+    circle_obj = objects[circle]
+    point_from_obj = objects[point_from]
+    point_to_obj = objects[point_to]
+    if (
+        type(circle_obj) is not Circle
+        or type(point_from_obj) is not Point
+        or type(point_to_obj) is not Point
+    ):
+        return
+    circle_obj.draw_from = degrees(
+        angle_to_horizontal(circle_obj.center, point_from_obj)
+    )
+    circle_obj.draw_to = degrees(angle_to_horizontal(circle_obj.center, point_to_obj))
 
 
 def footToLine(point: str, line: str, name: str):
@@ -154,6 +188,9 @@ safe_commands = {
     "createLine": createLine,
     "createCircle": createCircle,
     "createPlane": createPlane,
+    "setType": setType,
+    "setStyle": setStyle,
+    "setCircleDrawRange": setCircleDrawRange,
     "footToLine": footToLine,
     "intersect": intersect,
     "parallel": parallel,
@@ -191,7 +228,6 @@ class ObserverHandler(FileSystemEventHandler):
     @override
     def on_modified(self, event: FileSystemEvent):
         if self.path == event.src_path:
-            print(f"File modified: {event.src_path}")
             load_scene(file_path)
             visual.drawScene(objects)
 

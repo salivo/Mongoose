@@ -3,3 +3,14 @@ createPoint((-5,None,4), "D")
 createCircle("S1", 4, "k1")
 createCircle("S2", 4, "k2")
 createCircle("D2", 4, "d2")
+
+#to do arcs simply get intersection points
+intersect("k1", "k2", "intr1", 1)
+intersect("k1", "k2", "intr2", 2)
+#and parse them into this function
+setCircleDrawRange("k1", "intr1", "intr2")
+# it always draws clockwise so to draw smaller arc:
+createCircle("S1", 4, "k1copy")
+setCircleDrawRange("k1copy", "intr2", "intr1")
+setStyle("k1copy", "bold")
+setType("k1", "hidden")

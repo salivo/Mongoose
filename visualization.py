@@ -1,6 +1,8 @@
 # pyright: basic
 # ruff: noqa
-from matplotlib.patches import Circle as CirclePatch
+from time import sleep
+import time
+from matplotlib.patches import Arc, Circle as CirclePatch
 import matplotlib.pyplot as plt
 from geometry_math import *
 
@@ -23,15 +25,9 @@ class Visualization:
             )
 
     def drawLine(self, line: Line):
-        if line.name in ("org_x", "org_y"):
+        if line.type == "none":
             return
-        width = 1
-        style = "-"
-        if line.name.startswith("_"):
-            width = 0.5
-        if line.name.endswith(")"):
-            width = 0.5
-            style = "--"
+        width, style = self.convertStyle(line)
         self.ax.plot(
             [
                 line.p1.x - (line.p2.x - line.p1.x) * (line.resize[0] - 1),
@@ -47,9 +43,32 @@ class Visualization:
         )
 
     def drawCircle(self, circle: Circle):
-        self.ax.add_patch(
-            CirclePatch((circle.center.x, circle.center.y), circle.radius, fill=False)
-        )
+        if circle.type == "none":
+            return
+        width, style = self.convertStyle(circle)
+        if circle.draw_from is None or circle.draw_to is None:
+            self.ax.add_patch(
+                CirclePatch(
+                    (circle.center.x, circle.center.y),
+                    circle.radius,
+                    fill=False,
+                    linewidth=width,
+                    linestyle=style,
+                )
+            )
+        else:
+            self.ax.add_patch(
+                Arc(
+                    (circle.center.x, circle.center.y),
+                    circle.radius * 2,
+                    circle.radius * 2,
+                    theta1=circle.draw_from,
+                    theta2=circle.draw_to,
+                    fill=False,
+                    linewidth=width,
+                    linestyle=style,
+                )
+            )
 
     def drawAxis(self):
         self.ax.set_xticks([])
@@ -63,10 +82,10 @@ class Visualization:
         _ = self.ax.scatter(0, 0, color="black")  # pyright: ignore[reportUnknownMemberType]
         _ = self.ax.text(0.03, -0.15, "0₁,₂", color="black")  # pyright: ignore[reportUnknownMemberType]
 
-    def drawScene(self, objects):
+    def drawScene(self, objects: dict[str, Point | Line | Circle | Plane]) -> None:
         self.ax.clear()
         self.ax.set_aspect("equal", adjustable="box")
-        self.drawAxis()
+        # self.drawAxis()
         for obj in objects.values():
             match obj:
                 case Point():
@@ -75,11 +94,25 @@ class Visualization:
                     self.drawLine(obj)
                 case Circle():
                     self.drawCircle(obj)
+        self.fig.canvas.draw_idle()
+        self.fig.canvas.flush_events()
 
     def sceneLoop(self):
         while self.running:
             self.fig.canvas.draw_idle()
             self.fig.canvas.flush_events()
+            time.sleep(1)
 
     def on_close(self, event):
         self.running = False
+
+    def convertStyle(self, object: Circle | Line):
+        width = 1
+        style = "-"
+        if object.type == "hidden":
+            style = "--"
+        if object.type == "realsized":
+            style = "-."
+        if object.style == "bold":
+            width = 2
+        return width, style

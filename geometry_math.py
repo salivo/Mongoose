@@ -1,4 +1,4 @@
-from math import sqrt
+from math import atan2, sqrt
 import numpy as np
 
 
@@ -15,14 +15,26 @@ class Line:
         self.p2: Point = p2
         self.name: str = name
         self.type: str = "construct"
+        self.style: str = "normal"
         self.resize: tuple[float, float] = (1.0, 1.0)
 
 
 class Circle:
-    def __init__(self, center: Point, radius: float, name: str):
+    def __init__(
+        self,
+        center: Point,
+        radius: float,
+        name: str,
+        draw_from: float | None = None,
+        draw_to: float | None = None,
+    ):
         self.center: Point = center
         self.name: str = name
         self.radius: float = radius
+        self.draw_from: float | None = draw_from
+        self.draw_to: float | None = draw_to
+        self.type: str = "construct"
+        self.style: str = "normal"
 
 
 class Plane:
@@ -205,3 +217,9 @@ def parallel_point_by_line(
     )
 
     return intersect_line2line(parallel_line, line_to, name)
+
+
+def angle_to_horizontal(p1: Point, p2: Point):
+    dx = p2.x - p1.x
+    dy = p2.y - p1.y
+    return atan2(dy, dx)
