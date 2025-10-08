@@ -8,3 +8,11 @@ createPlane((7,4.5,7), "rho")
 findPointWithPlane("A1", "rho")
 # also for point in another quadrant
 findPointWithPlane("B2", "rho")
+
+#How it works
+parallel("A1", "org_y", "org_x", "p1")
+createLine("A1", "p1", "l1")
+parallel("A1", "rho1", "org_x", "p2")
+createLine("A1", "p2", "l2")
+parallel("p2", "org_y", "rho2", "p3")
+createLine("p2", "p3", "l3")

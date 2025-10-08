@@ -27,16 +27,17 @@ class Visualization:
     def drawLine(self, line: Line):
         if line.type == "none":
             return
+
         width, style = self.convertStyle(line)
+
+        x1 = line.p1.x - (line.p2.x - line.p1.x) * (line.resize[0] - 1)
+        x2 = line.p2.x + (line.p2.x - line.p1.x) * (line.resize[1] - 1)
+        y1 = line.p1.y - (line.p2.y - line.p1.y) * (line.resize[0] - 1)
+        y2 = line.p2.y + (line.p2.y - line.p1.y) * (line.resize[1] - 1)
+
         self.ax.plot(
-            [
-                line.p1.x - (line.p2.x - line.p1.x) * (line.resize[0] - 1),
-                line.p2.x + (line.p2.x - line.p1.x) * (line.resize[1] - 1),
-            ],
-            [
-                line.p1.y - (line.p2.y - line.p1.y) * (line.resize[0] - 1),
-                line.p2.y + (line.p2.y - line.p1.y) * (line.resize[1] - 1),
-            ],
+            [x1, x2],
+            [y1, y2],
             color=self.line_colors,
             linestyle=style,
             linewidth=width,
@@ -85,7 +86,7 @@ class Visualization:
     def drawScene(self, objects: dict[str, Point | Line | Circle | Plane]) -> None:
         self.ax.clear()
         self.ax.set_aspect("equal", adjustable="box")
-        # self.drawAxis()
+        self.drawAxis()
         for obj in objects.values():
             match obj:
                 case Point():

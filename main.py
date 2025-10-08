@@ -14,9 +14,11 @@ from geometry_math import (
     Circle,
     angle_to_horizontal,
     foot_of_perp,
+    generatePolygonPoints,
     intersect_circle2circle,
     intersect_circle2line,
     intersect_line2line,
+    measure_point2point_distance,
     parallel_point_by_distance,
     parallel_point_by_line,
     perpendicular_point_from_distance,
@@ -105,9 +107,11 @@ def createPerpFromPoint(
     point_obj = objects[point]
     line_obj = objects[line]
     if type(point_obj) is not Point or type(line_obj) is not Line:
+        print("Invalid Line or Point")
         return
     p = perpendicular_point_from_distance(point_obj, line_obj, distance, name)
     if p is None:
+        print("Cannot create perpendicular point")
         return
     objects[name] = p
 
@@ -183,6 +187,29 @@ def findPointWithPlane(point: str, plane: str):
     objects[newname] = result
 
 
+def measureDistance(obj1: str, obj2: str | None = None):
+    object1 = objects[obj1]
+    if type(object1) is Line:
+        return measure_point2point_distance(object1.p1, object1.p2)
+    if type(object1) is Point and obj2 is not None:
+        object2 = objects[obj2]
+        if type(object2) is not Point:
+            return None
+        return measure_point2point_distance(object1, object2)
+
+
+def createPolygon(center: str, startpoint: str, points: list[str]):
+    center_obj = objects[center]
+    startpoint_obj = objects[startpoint]
+    if type(center_obj) is not Point or type(startpoint_obj) is not Point:
+        return None
+    n = len(points) + 1
+    polygon_points = generatePolygonPoints(center_obj, startpoint_obj, n)
+    for coord, name in zip(polygon_points[1:], points):
+        p = Point(coord, name)
+        objects[name] = p
+
+
 safe_commands = {
     "createPoint": createPoint,
     "createLine": createLine,
@@ -196,6 +223,8 @@ safe_commands = {
     "parallel": parallel,
     "createPerpFromPoint": createPerpFromPoint,
     "findPointWithPlane": findPointWithPlane,
+    "measureDistance": measureDistance,
+    "createPolygon": createPolygon,
     "objects": objects,
 }
 
@@ -216,7 +245,8 @@ def load_scene(file_path: str):
             if tb.filename == "<string>":
                 user_frame = tb
         if user_frame:
-            print(f"Not allowed command on line {user_frame.lineno} in {file_path}")
+            print(f"Wrong command on line {user_frame.lineno} in {file_path}")
+            print(e)
         else:
             print(f"Error loading scene: {e}")
 

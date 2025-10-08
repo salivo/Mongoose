@@ -1,4 +1,5 @@
 from math import atan2, sqrt
+import math
 import numpy as np
 
 
@@ -223,3 +224,32 @@ def angle_to_horizontal(p1: Point, p2: Point):
     dx = p2.x - p1.x
     dy = p2.y - p1.y
     return atan2(dy, dx)
+
+
+def measure_point2point_distance(p1: Point, p2: Point):
+    dx = p2.x - p1.x
+    dy = p2.y - p1.y
+    return sqrt(dx**2 + dy**2)
+
+
+def generatePolygonPoints(
+    center: Point, start: Point, n: int
+) -> list[tuple[float, float]]:
+    cx, cy = center.x, center.y
+    sx, sy = start.x, start.y
+
+    # vector from center to start vertex
+    vx, vy = sx - cx, sy - cy
+    r = math.hypot(vx, vy)
+    theta0 = math.atan2(vy, vx)
+
+    angle_step = 2 * math.pi / n
+    vertices: list[tuple[float, float]] = []
+
+    for i in range(n):
+        theta = theta0 + i * angle_step
+        x = cx + r * math.cos(theta)
+        y = cy + r * math.sin(theta)
+        vertices.append((-x, y))
+
+    return vertices
