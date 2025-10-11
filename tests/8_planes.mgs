@@ -1,7 +1,11 @@
 createPoint((1,3.5,None), "A")
 createPoint((0,None,3.5), "B")
 
+# To create plane by cords
 createPlane((7,4.5,7), "rho")
+
+# To create plane with vertical line
+createPlane((4,"infinity",3), "alpha")
 
 # The most common operation with planes is find second projection of a point which is in the plane
 # To do that just simply do:

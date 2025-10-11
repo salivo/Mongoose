@@ -39,10 +39,24 @@ class Circle:
 
 
 class Plane:
-    def __init__(self, cords: tuple[float, float, float], name: str):
+    def __init__(self, cords: tuple[float, float | str, float | str], name: str):
         self.p0: Point = Point((cords[0], 0), "_P" + name + "0")
-        self.p1: Point = Point((0, -cords[1]), "_P" + name + "1")
-        self.p2: Point = Point((0, cords[2]), "_P" + name + "2")
+        print(cords[2], type(cords[2]))
+        if isinstance(cords[1], (float, int)):
+            self.p1: Point = Point((0, -cords[1]), "_P" + name + "1")
+        else:
+            if cords[1] == "infinity":
+                self.p1 = Point((cords[0], -cords[0]), "_P" + name + "1")
+            else:
+                raise ValueError("Invalid plane y coordinate")
+
+        if isinstance(cords[2], (float, int)):
+            self.p2: Point = Point((0, cords[2]), "_P" + name + "2")
+        else:
+            if cords[2] == "infinity":
+                self.p2 = Point((cords[0], cords[0]), "_P" + name + "2")
+            else:
+                raise ValueError("Invalid plane z coordinate")
         self.line1: Line = Line(self.p0, self.p1, name + "1")
         self.line2: Line = Line(self.p0, self.p2, name + "2")
         self.name: str = name

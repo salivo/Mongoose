@@ -56,7 +56,7 @@ def createCircle(p_name: str, radius: float, name: str):
         objects[name] = circle
 
 
-def createPlane(cords: tuple[float, float, float], name: str):
+def createPlane(cords: tuple[float, float | str, float | str], name: str):
     plane = Plane(cords, name)
     objects[name] = plane
     objects[name + "1"] = plane.line1
