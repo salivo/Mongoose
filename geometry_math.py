@@ -41,7 +41,6 @@ class Circle:
 class Plane:
     def __init__(self, cords: tuple[float, float | str, float | str], name: str):
         self.p0: Point = Point((cords[0], 0), "_P" + name + "0")
-        print(cords[2], type(cords[2]))
         if isinstance(cords[1], (float, int)):
             self.p1: Point = Point((0, -cords[1]), "_P" + name + "1")
         else:
