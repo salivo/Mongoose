@@ -6,6 +6,7 @@ from typing import cast, override
 from watchdog.events import FileSystemEvent, FileSystemEventHandler
 from watchdog.observers import Observer
 from watchdog.observers.api import BaseObserver
+from export import SVGExport
 from visualization import Visualization
 from geometry_math import (
     Plane,
@@ -268,16 +269,30 @@ def close(observer: BaseObserver) -> None:
 
 
 if __name__ == "__main__":
-    visual = Visualization()
     parser = argparse.ArgumentParser(description="Process a file path.")
     _ = parser.add_argument("file", help="Path to the input file")
+    _ = parser.add_argument(
+        "--export", help="Export to SVG file path (e.g., output.svg)"
+    )
     args = parser.parse_args()
+
     file_path = cast(str, args.file)
-    observer = Observer()
-    handler = ObserverHandler(file_path)
-    _ = observer.schedule(handler, file_path, recursive=True)
-    observer.start()
-    _ = atexit.register(close, observer)
-    load_scene(file_path)
-    visual.drawScene(objects)
-    visual.sceneLoop()
+    export_path = cast(str | None, args.export)
+
+    if export_path:
+        # Export mode
+        svg = SVGExport()
+        load_scene(file_path)
+        svg.drawScene(objects, filename=export_path)
+        print(f"Exported to {export_path}")
+    else:
+        # Interactive mode (your original code)
+        visual = Visualization()
+        observer = Observer()
+        handler = ObserverHandler(file_path)
+        _ = observer.schedule(handler, file_path, recursive=True)
+        observer.start()
+        _ = atexit.register(close, observer)
+        load_scene(file_path)
+        visual.drawScene(objects)
+        visual.sceneLoop()
