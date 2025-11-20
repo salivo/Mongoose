@@ -1,18 +1,19 @@
 import argparse
 import atexit
-from math import degrees
 import traceback
+from math import degrees
 from typing import cast, override
+
 from watchdog.events import FileSystemEvent, FileSystemEventHandler
 from watchdog.observers import Observer
 from watchdog.observers.api import BaseObserver
+
 from export import SVGExport
-from visualization import Visualization
 from geometry_math import (
+    Circle,
+    Line,
     Plane,
     Point,
-    Line,
-    Circle,
     angle_to_horizontal,
     foot_of_perp,
     generatePolygonPoints,
@@ -24,6 +25,7 @@ from geometry_math import (
     parallel_point_by_line,
     perpendicular_point_from_distance,
 )
+from visualization import Visualization
 
 objects: dict[str, Point | Line | Circle | Plane] = {}
 
@@ -152,7 +154,7 @@ def parallel(base_point: str, line_parallel_to: str, offset: str | int, name: st
         objects[name] = parallel_point_by_distance(p, line, offset, name)
 
 
-def findPointWithPlane(point: str, plane: str):
+def findPointWithPlane(point: str, plane: str, new_name: str | None = None):
     if point not in objects or plane not in objects:
         return
     pointobj = objects[point]
@@ -182,6 +184,8 @@ def findPointWithPlane(point: str, plane: str):
         raise ValueError(f"Name {pointobj.name} has no 1/2 suffix")
     if not p3:
         return
+    if new_name:
+        newname = new_name
     result = parallel_point_by_line(p3, org_x, Line(pointobj, p1, ""), newname)
     if result is None:
         return
@@ -227,6 +231,7 @@ safe_commands = {
     "measureDistance": measureDistance,
     "createPolygon": createPolygon,
     "objects": objects,
+    "print": print,
 }
 
 
