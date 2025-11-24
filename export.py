@@ -2,6 +2,9 @@
 # ruff: noqa
 from geometry_math import *
 import math
+import os
+import base64
+import subprocess
 
 
 class SVGExport:
@@ -13,7 +16,12 @@ class SVGExport:
         self.point_colors = "black"
         self.text_colors = "black"
         self.line_colors = "black"
+        self.point_style = "plus"
         self.svg_elements = []
+
+        self.name = ""
+        self.lastname_class = ""
+        self.number_date = ""
 
         # Coordinate system: 1 unit = 10mm
         self.mm_per_unit = 10
@@ -24,6 +32,18 @@ class SVGExport:
         self.max_x = 5
         self.min_y = -4
         self.max_y = 4
+
+    def set_workname(self, workname="Název výkresu"):
+        self.name = workname
+
+    def set_lastname(self, lastname="Příjmení", class_name="Název skupiny"):
+        self.lastname_class = f"{lastname}/{class_name}"
+
+    def set_id_date(self, id="ID", date="Datum"):
+        self.number_date = f"{id}/{date}"
+
+    def set_point_style(self, point_style="plus"):
+        self.point_style = point_style
 
     def set_bounds(self, min_x, max_x, min_y, max_y):
         """Set the coordinate bounds for the SVG viewport"""
@@ -51,39 +71,145 @@ class SVGExport:
         # Direct mm conversion: 1 coordinate unit = 10mm
         return length * self.mm_per_unit
 
-    def mm_to_svg(self, mm):
-        """Convert millimeters directly to SVG units"""
-        return mm
+    def _find_osifont_path(self):
+        """Find the path to osifont.ttf or .otf using fc-list (Linux) or manual search"""
+        print("Searching for osifont...")
+
+        # Method 1: Try Linux 'fc-list' command (Most reliable on Linux)
+        try:
+            # Run fc-list to find font file path
+            result = subprocess.run(
+                ["fc-list", ":", "file", "family"], capture_output=True, text=True
+            )
+            if result.returncode == 0:
+                for line in result.stdout.splitlines():
+                    # fc-list output format: /path/to/font.ttf: Family,Style
+                    if "osifont" in line.lower():
+                        parts = line.split(":")
+                        path = parts[0].strip()
+                        # Verify it is a ttf or otf
+                        if (
+                            path.lower().endswith(".ttf")
+                            or path.lower().endswith(".otf")
+                        ) and os.path.exists(path):
+                            print(f"Found font via fc-list: {path}")
+                            return path
+        except Exception as e:
+            print(f"fc-list search skipped or failed: {e}")
+
+        # Method 2: Manual directory walk (Fallback)
+        search_paths = [
+            os.path.expanduser("~/.local/share/fonts"),
+            os.path.expanduser("~/.fonts"),
+            "/usr/share/fonts",
+            "/usr/local/share/fonts",
+            "/usr/share/fonts/truetype",
+            "/usr/share/fonts/TTF",
+            "/usr/share/fonts/opentype",
+        ]
+
+        for search_dir in search_paths:
+            if not os.path.exists(search_dir):
+                continue
+            for root, dirs, files in os.walk(search_dir):
+                for file in files:
+                    # Check for both ttf and otf
+                    if "osifont" in file.lower() and (
+                        file.lower().endswith(".ttf") or file.lower().endswith(".otf")
+                    ):
+                        path = os.path.join(root, file)
+                        print(f"Found font via directory walk: {path}")
+                        return path
+
+        print("Error: osifont not found on system.")
+        return None
+
+    def _get_embedded_font_style(self):
+        """Reads the font file and returns correct SVG <defs> block"""
+        font_path = self._find_osifont_path()
+
+        if not font_path:
+            print(
+                "Warning: osifont not found. Text may not render correctly on printer."
+            )
+            return ""
+
+        try:
+            with open(font_path, "rb") as f:
+                font_data = f.read()
+                base64_font = base64.b64encode(font_data).decode("utf-8")
+
+            mime_type = "application/x-font-ttf"
+            font_fmt = "truetype"
+
+            if font_path.lower().endswith(".otf"):
+                mime_type = "application/font-sfnt"
+                font_fmt = "opentype"
+
+            return f"""
+                <defs>
+                    <style type="text/css"><![CDATA[
+                        @font-face {{
+                            font-family: 'osifont';
+                            src: url("data:{mime_type};base64,{base64_font}") format('{font_fmt}');
+                            font-weight: normal;
+                            font-style: normal;
+                        }}
+                    ]]></style>
+                </defs>
+            """
+        except Exception as e:
+            print(f"Error embedding font: {e}")
+            return ""
+
+    # --- Draw Test Text ---
+    def drawTemplate(self):
+        cx = self.width / 2
+
+        # Name of the work
+        self.svg_elements.append(
+            f'<text x="{cx:.2f}" y="10.00" '
+            f'fill="black" font-size="7" font-family="osifont" '
+            f'text-anchor="middle" dominant-baseline="text-before-edge">'
+            f"{self.name}</text>"
+        )
+        # Name and date
+        self.svg_elements.append(
+            f'<text x="10.00" y="{(self.height - 10):.2f}" '
+            f'fill="black" font-size="7" font-family="osifont" '
+            f'text-anchor="start" dominant-baseline="baseline">'
+            f"{self.lastname_class}</text>"
+        )
+        self.svg_elements.append(
+            f'<text x="{(self.width - 10):.2f}" y="{(self.height - 10):.2f}" '
+            f'fill="black" font-size="7" font-family="osifont" '
+            f'text-anchor="end" dominant-baseline="baseline">'
+            f"{self.number_date}</text>"
+        )
 
     def drawPoint(self, point: Point):
         x = self.transform_x(point.x)
         y = self.transform_y(point.y)
 
-        # Calculate half-size of the + symbol (3mm total, so 1.5mm each direction)
-        half_size = self.mm_to_svg(self.point_size_mm) / 2
+        half_size = self.point_size_mm / 2
 
-        # Draw + as two lines (horizontal and vertical)
-        # Horizontal line
-        self.svg_elements.append(
-            f'<line x1="{x - half_size:.2f}" y1="{y:.2f}" '
-            f'x2="{x + half_size:.2f}" y2="{y:.2f}" '
-            f'stroke="{self.point_colors}" stroke-width="0.1"/>'
-        )
-        # Vertical line
-        self.svg_elements.append(
-            f'<line x1="{x:.2f}" y1="{y - half_size:.2f}" '
-            f'x2="{x:.2f}" y2="{y + half_size:.2f}" '
-            f'stroke="{self.point_colors}" stroke-width="0.1"/>'
-        )
+        dot_size = self.point_size_mm / 10
 
-        # Only draw label for coordinate point (origin)
-        if point.x == 0 and point.y == 0:
-            text_x = x + 5
-            text_y = y + 15
+        if self.point_style == "dot":
             self.svg_elements.append(
-                f'<text x="{text_x:.2f}" y="{text_y:.2f}" '
-                f'fill="{self.text_colors}" font-size="5" font-family="osifont, monospace">'
-                f"{point.name}</text>"
+                f'<circle cx="{x:.2f}" cy="{y:.2f}" r="{dot_size:.2f}" '
+                f'fill="{self.point_colors}" stroke="none"/>'
+            )
+        else:
+            self.svg_elements.append(
+                f'<line x1="{x - half_size:.2f}" y1="{y:.2f}" '
+                f'x2="{x + half_size:.2f}" y2="{y:.2f}" '
+                f'stroke="{self.point_colors}" stroke-width="0.1"/>'
+            )
+            self.svg_elements.append(
+                f'<line x1="{x:.2f}" y1="{y - half_size:.2f}" '
+                f'x2="{x:.2f}" y2="{y + half_size:.2f}" '
+                f'stroke="{self.point_colors}" stroke-width="0.1"/>'
             )
 
     def drawLine(self, line: Line):
@@ -92,19 +218,16 @@ class SVGExport:
 
         width, style = self.convertStyle(line)
 
-        # Calculate extended line coordinates
         x1 = line.p1.x - (line.p2.x - line.p1.x) * (line.resize[0] - 1)
         x2 = line.p2.x + (line.p2.x - line.p1.x) * (line.resize[1] - 1)
         y1 = line.p1.y - (line.p2.y - line.p1.y) * (line.resize[0] - 1)
         y2 = line.p2.y + (line.p2.y - line.p1.y) * (line.resize[1] - 1)
 
-        # Transform to SVG coordinates
         svg_x1 = self.transform_x(x1)
         svg_y1 = self.transform_y(y1)
         svg_x2 = self.transform_x(x2)
         svg_y2 = self.transform_y(y2)
 
-        # Convert matplotlib linestyle to SVG stroke-dasharray
         dasharray = self.get_dasharray(style)
         dash_attr = f'stroke-dasharray="{dasharray}"' if dasharray else ""
 
@@ -127,32 +250,24 @@ class SVGExport:
         r = self.transform_length(circle.radius)
 
         if circle.draw_from is None or circle.draw_to is None:
-            # Full circle
             self.svg_elements.append(
                 f'<circle cx="{cx:.2f}" cy="{cy:.2f}" r="{r:.2f}" '
                 f'fill="none" stroke="black" stroke-width="{width}" {dash_attr}/>'
             )
         else:
-            # Arc
-            # Convert angles from degrees to radians
             start_angle = math.radians(circle.draw_from)
             end_angle = math.radians(circle.draw_to)
 
-            # Calculate start and end points of arc
             start_x = cx + r * math.cos(start_angle)
-            start_y = cy - r * math.sin(
-                start_angle
-            )  # Subtract because SVG y is inverted
+            start_y = cy - r * math.sin(start_angle)
             end_x = cx + r * math.cos(end_angle)
             end_y = cy - r * math.sin(end_angle)
 
-            # Determine if arc is large (> 180 degrees)
             angle_diff = end_angle - start_angle
             if angle_diff < 0:
                 angle_diff += 2 * math.pi
             large_arc = 1 if angle_diff > math.pi else 0
 
-            # SVG path for arc
             self.svg_elements.append(
                 f'<path d="M {start_x:.2f} {start_y:.2f} '
                 f'A {r:.2f} {r:.2f} 0 {large_arc} 0 {end_x:.2f} {end_y:.2f}" '
@@ -160,7 +275,6 @@ class SVGExport:
             )
 
     def drawAxis(self):
-        # Draw horizontal axis (y=0)
         y_axis = self.transform_y(0)
         self.svg_elements.append(
             f'<line x1="{self.padding}" y1="{y_axis:.2f}" '
@@ -168,28 +282,19 @@ class SVGExport:
             f'stroke="black" stroke-width="0.1"/>'
         )
 
-        # Draw origin point as + symbol
         ox = self.transform_x(0)
         oy = self.transform_y(0)
-        half_size = self.mm_to_svg(self.point_size_mm) / 2
+        half_size = self.point_size_mm / 2
 
-        # Horizontal line of +
         self.svg_elements.append(
             f'<line x1="{ox - half_size:.2f}" y1="{oy:.2f}" '
             f'x2="{ox + half_size:.2f}" y2="{oy:.2f}" '
             f'stroke="black" stroke-width="0.1"/>'
         )
-        # Vertical line of +
         self.svg_elements.append(
             f'<line x1="{ox:.2f}" y1="{oy - half_size:.2f}" '
             f'x2="{ox:.2f}" y2="{oy + half_size:.2f}" '
             f'stroke="black" stroke-width="0.1"/>'
-        )
-
-        # Draw origin label with osifont and 5mm height
-        self.svg_elements.append(
-            f'<text x="{ox + 5:.2f}" y="{oy + 7:.2f}" '
-            f'fill="black" font-size="5" font-family="osifont, monospace">0₁,₂</text>'
         )
 
     def drawScene(
@@ -199,7 +304,9 @@ class SVGExport:
     ) -> None:
         """Draw scene and save to SVG file"""
         self.svg_elements = []
+
         self.drawAxis()
+        self.drawTemplate()
 
         for obj in objects.values():
             match obj:
@@ -215,13 +322,13 @@ class SVGExport:
     def save(self, filename: str = "output.svg"):
         """Save the SVG to a file"""
         svg_content = f'''<?xml version="1.0" encoding="UTF-8" standalone="no"?>
-<svg width="{self.width}mm" height="{self.height}mm"
-     viewBox="0 0 {self.width} {self.height}"
-     xmlns="http://www.w3.org/2000/svg"
-     xmlns:xlink="http://www.w3.org/1999/xlink">
-    <rect width="100%" height="100%" fill="white"/>
-    {"".join(self.svg_elements)}
-</svg>'''
+            <svg width="{self.width}mm" height="{self.height}mm"
+                viewBox="0 0 {self.width} {self.height}"
+                xmlns="http://www.w3.org/2000/svg"
+                xmlns:xlink="http://www.w3.org/1999/xlink">
+                <rect width="100%" height="100%" fill="white"/>
+                {"".join(self.svg_elements)}
+            </svg>'''
 
         with open(filename, "w", encoding="utf-8") as f:
             f.write(svg_content)
@@ -229,16 +336,15 @@ class SVGExport:
     def get_svg_string(self) -> str:
         """Return the SVG as a string"""
         return f'''<?xml version="1.0" encoding="UTF-8" standalone="no"?>
-<svg width="{self.width}mm" height="{self.height}mm"
-     viewBox="0 0 {self.width} {self.height}"
-     xmlns="http://www.w3.org/2000/svg"
-     xmlns:xlink="http://www.w3.org/1999/xlink">
-    <rect width="100%" height="100%" fill="white"/>
-    {"".join(self.svg_elements)}
-</svg>'''
+            <svg width="{self.width}mm" height="{self.height}mm"
+                viewBox="0 0 {self.width} {self.height}"
+                xmlns="http://www.w3.org/2000/svg"
+                xmlns:xlink="http://www.w3.org/1999/xlink">
+                <rect width="100%" height="100%" fill="white"/>
+                {"".join(self.svg_elements)}
+            </svg>'''
 
     def get_dasharray(self, style: str) -> str:
-        """Convert matplotlib linestyle to SVG stroke-dasharray"""
         if style == "--":
             return "5,5"
         elif style == "-.":
@@ -248,13 +354,12 @@ class SVGExport:
         return ""
 
     def convertStyle(self, object: Circle | Line):
-        """Convert object style to width and linestyle"""
-        width = 0.1  # Normal line width in mm
+        width = 0.05
         style = "-"
         if object.type == "hidden":
             style = "--"
         if object.type == "realsized":
             style = "-."
         if object.style == "bold":
-            width = 0.3  # Bold line width in mm
+            width = 0.1
         return width, style

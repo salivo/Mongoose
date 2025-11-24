@@ -75,4 +75,16 @@ python main.py tests/3_perpendicular.mgs
 > python3 main.py tests/3_perpendicular.mgs
 > ```
 
+To export the result to SVG:
+
+```bash
+python main.py work/kc-x.mgs --export output.svg
+```
+
+to see all available arguments:
+
+```bash
+python main.py --help
+```
+
 ---

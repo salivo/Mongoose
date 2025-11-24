@@ -1,6 +1,9 @@
 import argparse
 import atexit
+import configparser
+import os
 import traceback
+from datetime import datetime
 from math import degrees
 from typing import cast, override
 
@@ -33,6 +36,8 @@ org_x: Line = Line(Point((-10, 0), "ORG_X_1"), Point((10, 0), "ORG_X_1"), "org_x
 org_x.type = "none"
 org_y: Line = Line(Point((0, -10), "ORG_Y_1"), Point((0, 10), "ORG_Y_1"), "org_y")
 org_y.type = "none"
+
+true_keywords = ["true", "yes", "on", "enabled", "active", "yeah", "yep"]
 
 
 def createPoint(cords: tuple[float, float | None, float | None], name: str):
@@ -279,14 +284,37 @@ if __name__ == "__main__":
     _ = parser.add_argument(
         "--export", help="Export to SVG file path (e.g., output.svg)"
     )
+    _ = parser.add_argument(
+        "-n", "--name", help="Name of work, will show up on top after export"
+    )
     args = parser.parse_args()
+    config = configparser.ConfigParser()
+    if os.path.exists("work/config.conf"):
+        config.read("work/config.conf")
+    else:
+        config.read("config.conf")
+
+    lastname = config["me"]["lastname"]
+    class_name = config["me"]["class"]
+    point_style = config["export"]["point_style"]
 
     file_path = cast(str, args.file)
     export_path = cast(str | None, args.export)
+    workname = cast(str | None, args.name)
+
+    if not workname:
+        workname = "Untitled"
 
     if export_path:
         # Export mode
         svg = SVGExport()
+        svg.set_lastname(lastname, class_name)
+        folder, file = export_path.rsplit("/", 1)
+        workid = file.rsplit(".", 1)[0].upper()
+        svg.set_workname(workname)
+        svg.set_id_date(workid, datetime.now().strftime("%d.%m.%Y"))
+        print(point_style)
+        svg.set_point_style(point_style)
         load_scene(file_path)
         svg.drawScene(objects, filename=export_path)
         print(f"Exported to {export_path}")
