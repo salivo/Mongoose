@@ -32,6 +32,10 @@ class SVGExport:
         self.max_x = 5
         self.min_y = -4
         self.max_y = 4
+        self.offset_x = 0.0
+        self.offset_y = 0.0
+
+        self.hidden_lines_style = "normal"
 
     def set_workname(self, workname="Název výkresu"):
         self.name = workname
@@ -45,6 +49,13 @@ class SVGExport:
     def set_point_style(self, point_style="plus"):
         self.point_style = point_style
 
+    def set_hidden_lines_style(self, hidden_lines_style="normal"):
+        self.hidden_lines_style = hidden_lines_style
+
+    def set_offset(self, offset_x=0.0, offset_y=0.0):
+        self.offset_x = offset_x
+        self.offset_y = offset_y
+
     def set_bounds(self, min_x, max_x, min_y, max_y):
         """Set the coordinate bounds for the SVG viewport"""
         self.min_x = min_x
@@ -57,14 +68,14 @@ class SVGExport:
         # Direct mm conversion: 1 coordinate unit = 10mm
         x_mm = x * self.mm_per_unit
         # Center horizontally on A4
-        return self.width / 2 + x_mm
+        return self.width / 2 + x_mm + self.offset_x
 
     def transform_y(self, y):
         """Transform mathematical y-coordinate to SVG y-coordinate (centered on A4, inverted)"""
         # Direct mm conversion: 1 coordinate unit = 10mm
         y_mm = y * self.mm_per_unit
         # Center vertically on A4, invert Y axis
-        return self.height / 2 - y_mm
+        return self.height / 2 - y_mm + self.offset_y
 
     def transform_length(self, length):
         """Transform a length value to SVG scale"""
@@ -215,7 +226,10 @@ class SVGExport:
     def drawLine(self, line: Line):
         if line.type == "none":
             return
-
+        if line.type == "hidden" and self.hidden_lines_style == "none":
+            return
+        if line.type == "realsized" and self.hidden_lines_style == "none":
+            return
         width, style = self.convertStyle(line)
 
         x1 = line.p1.x - (line.p2.x - line.p1.x) * (line.resize[0] - 1)
@@ -240,7 +254,10 @@ class SVGExport:
     def drawCircle(self, circle: Circle):
         if circle.type == "none":
             return
-
+        if circle.type == "hidden" and self.hidden_lines_style == "none":
+            return
+        if circle.type == "realsized" and self.hidden_lines_style == "none":
+            return
         width, style = self.convertStyle(circle)
         dasharray = self.get_dasharray(style)
         dash_attr = f'stroke-dasharray="{dasharray}"' if dasharray else ""

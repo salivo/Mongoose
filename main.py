@@ -287,6 +287,8 @@ if __name__ == "__main__":
     _ = parser.add_argument(
         "-n", "--name", help="Name of work, will show up on top after export"
     )
+    _ = parser.add_argument("-x", "--offset_x", help="X export offset")
+    _ = parser.add_argument("-y", "--offset_y", help="Y export offset")
     args = parser.parse_args()
     config = configparser.ConfigParser()
     if os.path.exists("work/config.conf"):
@@ -300,26 +302,34 @@ if __name__ == "__main__":
 
     file_path = cast(str, args.file)
     export_path = cast(str | None, args.export)
+    hiddenlines_style = config["export"]["hiddenlines_style"]
     workname = cast(str | None, args.name)
+
+    offset_x = cast(str | None, args.offset_x)
+    offset_y = cast(str | None, args.offset_y)
+
+    if not offset_x:
+        offset_x = "0.0"
+    if not offset_y:
+        offset_y = "0.0"
 
     if not workname:
         workname = "Untitled"
 
     if export_path:
-        # Export mode
         svg = SVGExport()
         svg.set_lastname(lastname, class_name)
         folder, file = export_path.rsplit("/", 1)
         workid = file.rsplit(".", 1)[0].upper()
         svg.set_workname(workname)
         svg.set_id_date(workid, datetime.now().strftime("%d.%m.%Y"))
-        print(point_style)
+        svg.set_hidden_lines_style(hiddenlines_style)
         svg.set_point_style(point_style)
+        svg.set_offset(float(offset_x), float(offset_y))
         load_scene(file_path)
         svg.drawScene(objects, filename=export_path)
         print(f"Exported to {export_path}")
     else:
-        # Interactive mode (your original code)
         visual = Visualization()
         observer = Observer()
         handler = ObserverHandler(file_path)
