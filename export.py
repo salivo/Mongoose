@@ -179,9 +179,9 @@ class SVGExport:
 
         # Name of the work
         self.svg_elements.append(
-            f'<text x="{cx:.2f}" y="10.00" '
+            f'<text x="{cx:.2f}" y="17.00" '
             f'fill="black" font-size="7" font-family="osifont" '
-            f'text-anchor="middle" dominant-baseline="text-before-edge">'
+            f'text-anchor="middle" dominant-baseline="baseline">'
             f"{self.name}</text>"
         )
         # Name and date
@@ -365,7 +365,7 @@ class SVGExport:
         if style == "--":
             return "5,5"
         elif style == "-.":
-            return "10,3,2,3"
+            return "10,3,1,3"
         elif style == ":":
             return "2,2"
         return ""
