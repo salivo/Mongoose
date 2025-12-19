@@ -337,5 +337,6 @@ if __name__ == "__main__":
         observer.start()
         _ = atexit.register(close, observer)
         load_scene(file_path)
+        visual.set_file_path(file_path)
         visual.drawScene(objects)
         visual.sceneLoop()
