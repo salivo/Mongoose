@@ -1,19 +1,28 @@
+import cmd
 import sys
 from typing import override
 
 from PyQt6.QtCore import QPointF, Qt
 from PyQt6.QtGui import QAction, QWheelEvent
 from PyQt6.QtWidgets import (
+    QAbstractItemView,
     QApplication,
+    QDockWidget,
+    QHeaderView,
+    QListWidget,
+    QListWidgetItem,
     QMainWindow,
+    QTableWidget,
     QVBoxLayout,
     QWidget,
 )
 
-from drawing_canvas import DrawingCanvas
+from canvas import DrawingCanvas
 from geometry_math import Circle, Line, Plane, Point
+from object_preview_widget import ObjectPreviewWidget
+from project import Project, ProjectOps
 
-objects: dict[str, Point | Line | Circle | Plane] = {}
+project = Project()
 
 
 class MainWindow(QMainWindow):
@@ -26,9 +35,10 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(central_widget)
         layout = QVBoxLayout(central_widget)
         layout.setContentsMargins(0, 0, 0, 0)
-        self.canvas = DrawingCanvas(objects)
+        self.canvas = DrawingCanvas(project.objects)
         layout.addWidget(self.canvas)
         self.init_menubar()
+        self.init_objects_panel()
 
     @override
     def wheelEvent(self, a0: QWheelEvent | None):
@@ -95,6 +105,27 @@ class MainWindow(QMainWindow):
         zoom_in_action.triggered.connect(self.zoom_in)
         edit_menu.addAction(zoom_in_action)
 
+    def init_objects_panel(self):
+        self.dock = QDockWidget("Objects", self)
+        self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, self.dock)
+        self.object_list = QListWidget()
+        self.object_list.setSelectionMode(
+            QAbstractItemView.SelectionMode.SingleSelection
+        )
+        self.dock.setWidget(self.object_list)
+        for element in project.history:
+            item = QListWidgetItem(self.object_list)
+            name, show = ProjectOps.history_object_get_name(element)
+            name_type = ""
+            if not show:
+                name_type = "hidden"
+            row_widget = ObjectPreviewWidget(
+                name, "gg", self.object_list, name_type=name_type
+            )
+            item.setSizeHint(row_widget.sizeHint())
+            self.object_list.addItem(item)
+            self.object_list.setItemWidget(item, row_widget)
+
     def file_new_triggered(self):
         print("New File clicked!")
 
@@ -109,17 +140,8 @@ class MainWindow(QMainWindow):
         self.canvas.update()
 
 
-def createPoint(cords: tuple[float, float | None, float | None], name: str):
-    if cords[1] is not None:
-        p1 = Point((cords[0], -cords[1]), name + "1")
-        objects[name + "1"] = p1
-    if cords[2] is not None:
-        p2 = Point((cords[0], cords[2]), name + "2")
-        objects[name + "2"] = p2
-
-
 if __name__ == "__main__":
-    createPoint((2, 1, 3), "ABOBUA")
+    project.open("tests/2_lines.mgs")
     app = QApplication(sys.argv)
     window = MainWindow()
     window.show()

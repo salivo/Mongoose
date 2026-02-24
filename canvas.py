@@ -4,7 +4,7 @@ from PyQt6.QtCore import QPointF, Qt
 from PyQt6.QtGui import QColor, QPainter, QPen
 from PyQt6.QtWidgets import QWidget
 
-from geometry_math import Point
+from geometry_math import Circle, Line, Plane, Point
 
 
 class DrawingCanvas(QWidget):
@@ -79,8 +79,8 @@ class DrawingCanvas(QWidget):
         for obj in self.objects.values():
             if isinstance(obj, Point):
                 self.draw_point(painter, obj)
-            # elif isinstance(obj, Line):
-            #     self.draw_line(obj)
+            elif isinstance(obj, Line):
+                self.draw_line(painter, obj)
             # elif isinstance(obj, Circle):
             #     self.draw_circle(obj)
             # elif isinstance(obj, Plane):
@@ -91,3 +91,14 @@ class DrawingCanvas(QWidget):
         pen.setCapStyle(Qt.PenCapStyle.RoundCap)
         painter.setPen(pen)
         painter.drawPoint(QPointF(point.x * self.scale, point.y * self.scale))
+
+    def draw_line(self, painter: QPainter, line: Line):
+        pen = QPen(QColor(0, 0, 0), 1)
+        pen.setCapStyle(Qt.PenCapStyle.RoundCap)
+        painter.setPen(pen)
+        painter.drawLine(
+            int(line.p1.x * self.scale),
+            int(line.p1.y * self.scale),
+            int(line.p2.x * self.scale),
+            int(line.p2.y * self.scale),
+        )
