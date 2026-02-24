@@ -1,43 +1,112 @@
-import argparse
-import atexit
-import configparser
-import os
-import traceback
-from datetime import datetime
-from math import degrees
-from typing import cast, override
+import sys
+from typing import override
 
-from watchdog.events import FileSystemEvent, FileSystemEventHandler
-from watchdog.observers import Observer
-from watchdog.observers.api import BaseObserver
-
-from export import SVGExport
-from geometry_math import (
-    Circle,
-    Line,
-    Plane,
-    Point,
-    angle_to_horizontal,
-    foot_of_perp,
-    generatePolygonPoints,
-    intersect_circle2circle,
-    intersect_circle2line,
-    intersect_line2line,
-    measure_point2point_distance,
-    parallel_point_by_distance,
-    parallel_point_by_line,
-    perpendicular_point_from_distance,
+from PyQt6.QtCore import QPointF, Qt
+from PyQt6.QtGui import QAction, QWheelEvent
+from PyQt6.QtWidgets import (
+    QApplication,
+    QMainWindow,
+    QVBoxLayout,
+    QWidget,
 )
-from visualization import Visualization
+
+from drawing_canvas import DrawingCanvas
+from geometry_math import Circle, Line, Plane, Point
 
 objects: dict[str, Point | Line | Circle | Plane] = {}
 
-org_x: Line = Line(Point((-10, 0), "ORG_X_1"), Point((10, 0), "ORG_X_1"), "org_x")
-org_x.type = "none"
-org_y: Line = Line(Point((0, -10), "ORG_Y_1"), Point((0, 10), "ORG_Y_1"), "org_y")
-org_y.type = "none"
 
-true_keywords = ["true", "yes", "on", "enabled", "active", "yeah", "yep"]
+class MainWindow(QMainWindow):
+    def __init__(self):
+        super().__init__()
+        self.sencetivity = 1
+        self.zoom_in_factor = 1.1
+        central_widget = QWidget()
+        self.last_mouse_pos = QPointF()
+        self.setCentralWidget(central_widget)
+        layout = QVBoxLayout(central_widget)
+        layout.setContentsMargins(0, 0, 0, 0)
+        self.canvas = DrawingCanvas(objects)
+        layout.addWidget(self.canvas)
+        self.init_menubar()
+
+    @override
+    def wheelEvent(self, a0: QWheelEvent | None):
+        if a0 is None:
+            return
+        mouse_pos = a0.position()
+        factor = (
+            self.zoom_in_factor if a0.angleDelta().y() > 0 else 1 / self.zoom_in_factor
+        )
+        center = QPointF(self.canvas.width() / 2, self.canvas.height() / 2)
+        relative_pos = mouse_pos - (center + self.canvas.offset)
+        self.canvas.offset -= relative_pos * (factor - 1)
+        self.canvas.zoom *= factor
+        self.canvas.update()
+        a0.accept()
+
+    @override
+    def mouseMoveEvent(self, a0):
+        if a0 is None:
+            return
+        event = a0
+        if event.buttons() & Qt.MouseButton.MiddleButton:
+            current_pos = event.position()
+            delta = current_pos - self.last_mouse_pos
+            self.canvas.offset += delta * self.sencetivity
+            self.last_mouse_pos = current_pos
+            self.update()
+            event.accept()
+
+    def mousePressEvent(self, a0):
+        if a0 is None:
+            return
+        if a0.button() == Qt.MouseButton.MiddleButton:
+            self.last_mouse_pos = a0.position()
+            a0.accept()
+
+    def init_menubar(self):
+        menubar = self.menuBar()
+        if not menubar:
+            return
+        file_menu = menubar.addMenu("&File")
+        if not file_menu:
+            return
+        new_action = QAction("New", self)
+        new_action.setShortcut("Ctrl+N")
+        new_action.triggered.connect(self.file_new_triggered)
+        file_menu.addAction(new_action)
+        open_action = QAction("Open", self)
+        open_action.setShortcut("Ctrl+O")
+        open_action.triggered.connect(self.file_open_triggered)
+        file_menu.addAction(open_action)
+        save_action = QAction("Save", self)
+        save_action.setShortcut("Ctrl+S")
+        save_action.triggered.connect(self.file_save_triggered)
+        file_menu.addAction(save_action)
+        exit_action = QAction("Exit", self)
+        exit_action.triggered.connect(self.close)
+        file_menu.addSeparator()
+        file_menu.addAction(exit_action)
+        edit_menu = menubar.addMenu("&Edit")
+        if not edit_menu:
+            return
+        zoom_in_action = QAction("Zoom In", self)
+        zoom_in_action.triggered.connect(self.zoom_in)
+        edit_menu.addAction(zoom_in_action)
+
+    def file_new_triggered(self):
+        print("New File clicked!")
+
+    def file_open_triggered(self):
+        print("Open File clicked!")
+
+    def file_save_triggered(self):
+        print("Save File clicked!")
+
+    def zoom_in(self):
+        self.canvas.zoom *= 1.25
+        self.canvas.update()
 
 
 def createPoint(cords: tuple[float, float | None, float | None], name: str):
@@ -49,293 +118,9 @@ def createPoint(cords: tuple[float, float | None, float | None], name: str):
         objects[name + "2"] = p2
 
 
-def createLine(p1_name: str, p2_name: str, name: str):
-    p1 = objects[p1_name]
-    p2 = objects[p2_name]
-    if type(p1) is Point and type(p2) is Point:
-        line = Line(p1, p2, name)
-        objects[name] = line
-
-
-def createCircle(p_name: str, radius: float, name: str):
-    p = objects[p_name]
-    if type(p) is Point:
-        circle = Circle(p, radius, name)
-        objects[name] = circle
-
-
-def createPlane(cords: tuple[float, float | str, float | str], name: str):
-    plane = Plane(cords, name)
-    objects[name] = plane
-    objects[name + "1"] = plane.line1
-    objects[name + "2"] = plane.line2
-
-
-def setType(obj: str, line_type: str):
-    object = objects[obj]
-    if type(object) is not Circle and type(object) is not Line:
-        return
-    object.type = line_type
-
-
-def setStyle(obj: str, line_style: str):
-    object = objects[obj]
-    if type(object) is not Circle and type(object) is not Line:
-        return
-    object.style = line_style
-
-
-def setCircleDrawRange(circle: str, point_from: str, point_to: str):
-    circle_obj = objects[circle]
-    point_from_obj = objects[point_from]
-    point_to_obj = objects[point_to]
-    if (
-        type(circle_obj) is not Circle
-        or type(point_from_obj) is not Point
-        or type(point_to_obj) is not Point
-    ):
-        return
-    circle_obj.draw_from = degrees(
-        angle_to_horizontal(circle_obj.center, point_from_obj)
-    )
-    circle_obj.draw_to = degrees(angle_to_horizontal(circle_obj.center, point_to_obj))
-
-
-def footToLine(point: str, line: str, name: str):
-    point_obj = objects[point]
-    line_obj = objects[line]
-    if type(point_obj) is not Point or type(line_obj) is not Line:
-        return
-    objects[name] = foot_of_perp(line_obj, point_obj, name)
-
-
-def createPerpFromPoint(
-    point: str, line: str, distance: float, name: str
-) -> Point | None:
-    point_obj = objects[point]
-    line_obj = objects[line]
-    if type(point_obj) is not Point or type(line_obj) is not Line:
-        print("Invalid Line or Point")
-        return
-    p = perpendicular_point_from_distance(point_obj, line_obj, distance, name)
-    if p is None:
-        print("Cannot create perpendicular point")
-        return
-    objects[name] = p
-
-
-def intersect(obj1: str, obj2: str, name: str, n: int = 1):
-    a = objects[obj1]
-    b = objects[obj2]
-    if isinstance(a, Line) and isinstance(b, Line):
-        p = intersect_line2line(a, b, name)
-    elif isinstance(a, Circle) and isinstance(b, Circle):
-        p = intersect_circle2circle(a, b, name, n)
-    elif isinstance(a, Circle) and isinstance(b, Line):
-        p = intersect_circle2line(a, b, name, n)
-    elif isinstance(a, Line) and isinstance(b, Circle):
-        p = intersect_circle2line(b, a, name, n)
-    else:
-        print("Unsupported types for intersection")
-        return
-    if p is None:
-        return
-    objects[name] = p
-
-
-def parallel(base_point: str, line_parallel_to: str, offset: str | int, name: str):
-    p = objects[base_point]
-    line = objects[line_parallel_to]
-    if not isinstance(p, Point) or not isinstance(line, Line):
-        return
-    if isinstance(offset, str):
-        lineto = objects[offset]
-        if isinstance(lineto, Line):
-            result = parallel_point_by_line(p, line, lineto, name)
-            if result is None:
-                return
-            objects[name] = result
-    else:
-        objects[name] = parallel_point_by_distance(p, line, offset, name)
-
-
-def findPointWithPlane(point: str, plane: str, new_name: str | None = None):
-    if point not in objects or plane not in objects:
-        return
-    pointobj = objects[point]
-    planeobj = objects[plane]
-    if not isinstance(pointobj, Point) or not isinstance(planeobj, Plane):
-        return
-    newname = pointobj.name
-
-    p1 = parallel_point_by_line(pointobj, org_y, org_x, "")
-    if p1 is None:
-        return
-
-    if pointobj.name.endswith("1"):
-        newname = pointobj.name[:-1] + "2"
-        p2 = parallel_point_by_line(pointobj, planeobj.line1, org_x, "")
-        if p2 is None:
-            return
-        p3 = parallel_point_by_line(p2, org_y, planeobj.line2, "")
-
-    elif pointobj.name.endswith("2"):
-        newname = pointobj.name[:-1] + "1"
-        p2 = parallel_point_by_line(pointobj, planeobj.line2, org_x, "")
-        if p2 is None:
-            return
-        p3 = parallel_point_by_line(p2, org_y, planeobj.line1, "")
-    else:
-        raise ValueError(f"Name {pointobj.name} has no 1/2 suffix")
-    if not p3:
-        return
-    if new_name:
-        newname = new_name
-    result = parallel_point_by_line(p3, org_x, Line(pointobj, p1, ""), newname)
-    if result is None:
-        return
-    objects[newname] = result
-
-
-def measureDistance(obj1: str, obj2: str | None = None):
-    object1 = objects[obj1]
-    if type(object1) is Line:
-        return measure_point2point_distance(object1.p1, object1.p2)
-    if type(object1) is Point and obj2 is not None:
-        object2 = objects[obj2]
-        if type(object2) is not Point:
-            return None
-        return measure_point2point_distance(object1, object2)
-
-
-def createPolygon(center: str, startpoint: str, points: list[str]):
-    center_obj = objects[center]
-    startpoint_obj = objects[startpoint]
-    if type(center_obj) is not Point or type(startpoint_obj) is not Point:
-        return None
-    n = len(points) + 1
-    polygon_points = generatePolygonPoints(center_obj, startpoint_obj, n)
-    for coord, name in zip(polygon_points[1:], points):
-        p = Point(coord, name)
-        objects[name] = p
-
-
-safe_commands = {
-    "createPoint": createPoint,
-    "createLine": createLine,
-    "createCircle": createCircle,
-    "createPlane": createPlane,
-    "setType": setType,
-    "setStyle": setStyle,
-    "setCircleDrawRange": setCircleDrawRange,
-    "footToLine": footToLine,
-    "intersect": intersect,
-    "parallel": parallel,
-    "createPerpFromPoint": createPerpFromPoint,
-    "findPointWithPlane": findPointWithPlane,
-    "measureDistance": measureDistance,
-    "createPolygon": createPolygon,
-    "objects": objects,
-    "print": print,
-}
-
-
-def load_scene(file_path: str):
-    objects.clear()
-    objects["org_x"] = org_x
-    objects["org_y"] = org_y
-    with open(file_path) as f:
-        code = f.read()
-    try:
-        exec(code, {"__builtins__": None}, safe_commands)
-    except Exception as e:
-        tb_list = traceback.extract_tb(e.__traceback__)
-        # find the last frame that belongs to the user's file
-        user_frame = None
-        for tb in tb_list:
-            if tb.filename == "<string>":
-                user_frame = tb
-        if user_frame:
-            print(f"Wrong command on line {user_frame.lineno} in {file_path}")
-            print(e)
-        else:
-            print(f"Error loading scene: {e}")
-
-
-class ObserverHandler(FileSystemEventHandler):
-    def __init__(self, path: str):
-        self.path: str = path
-
-    @override
-    def on_modified(self, event: FileSystemEvent):
-        if self.path == event.src_path:
-            load_scene(file_path)
-            visual.drawScene(objects)
-
-
-def close(observer: BaseObserver) -> None:
-    observer.stop()
-    observer.join()
-
-
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Process a file path.")
-    _ = parser.add_argument("file", help="Path to the input file")
-    _ = parser.add_argument(
-        "--export", help="Export to SVG file path (e.g., output.svg)"
-    )
-    _ = parser.add_argument(
-        "-n", "--name", help="Name of work, will show up on top after export"
-    )
-    _ = parser.add_argument("-x", "--offset_x", help="X export offset")
-    _ = parser.add_argument("-y", "--offset_y", help="Y export offset")
-    args = parser.parse_args()
-    config = configparser.ConfigParser()
-    if os.path.exists("work/config.conf"):
-        config.read("work/config.conf")
-    else:
-        config.read("config.conf")
-
-    lastname = config["me"]["lastname"]
-    class_name = config["me"]["class"]
-    point_style = config["export"]["point_style"]
-
-    file_path = cast(str, args.file)
-    export_path = cast(str | None, args.export)
-    hiddenlines_style = config["export"]["hiddenlines_style"]
-    workname = cast(str | None, args.name)
-
-    offset_x = cast(str | None, args.offset_x)
-    offset_y = cast(str | None, args.offset_y)
-
-    if not offset_x:
-        offset_x = "0.0"
-    if not offset_y:
-        offset_y = "0.0"
-
-    if not workname:
-        workname = "Untitled"
-
-    if export_path:
-        svg = SVGExport()
-        svg.set_lastname(lastname, class_name)
-        folder, file = export_path.rsplit("/", 1)
-        workid = file.rsplit(".", 1)[0].upper()
-        svg.set_workname(workname)
-        svg.set_id_date(workid, datetime.now().strftime("%d.%m.%Y"))
-        svg.set_hidden_lines_style(hiddenlines_style)
-        svg.set_point_style(point_style)
-        svg.set_offset(float(offset_x), float(offset_y))
-        load_scene(file_path)
-        svg.drawScene(objects, filename=export_path)
-        print(f"Exported to {export_path}")
-    else:
-        visual = Visualization()
-        observer = Observer()
-        handler = ObserverHandler(file_path)
-        _ = observer.schedule(handler, file_path, recursive=True)
-        observer.start()
-        _ = atexit.register(close, observer)
-        load_scene(file_path)
-        visual.drawScene(objects)
-        visual.sceneLoop()
+    createPoint((2, 1, 3), "ABOBUA")
+    app = QApplication(sys.argv)
+    window = MainWindow()
+    window.show()
+    sys.exit(app.exec())
