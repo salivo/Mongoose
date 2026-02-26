@@ -9,6 +9,7 @@ from PyQt6.QtWidgets import (
     QApplication,
     QDockWidget,
     QHeaderView,
+    QLineEdit,
     QListWidget,
     QListWidgetItem,
     QMainWindow,
@@ -20,7 +21,7 @@ from PyQt6.QtWidgets import (
 from canvas import DrawingCanvas
 from geometry_math import Circle, Line, Plane, Point
 from object_preview_widget import ObjectPreviewWidget
-from project import Project, ProjectOps
+from project import Project
 
 project = Project()
 
@@ -114,17 +115,36 @@ class MainWindow(QMainWindow):
         )
         self.dock.setWidget(self.object_list)
         for element in project.history:
-            item = QListWidgetItem(self.object_list)
-            name, show = ProjectOps.history_object_get_name(element)
-            name_type = ""
-            if not show:
-                name_type = "hidden"
-            row_widget = ObjectPreviewWidget(
-                name, "gg", self.object_list, name_type=name_type
-            )
-            item.setSizeHint(row_widget.sizeHint())
-            self.object_list.addItem(item)
-            self.object_list.setItemWidget(item, row_widget)
+            self.insert_object_to_sidepanel(self.object_list.count(), element)
+        container_item = QListWidgetItem(self.object_list)
+        self.input_field = QLineEdit()
+        self.input_field.setPlaceholderText("Enter coordinates (e.g. 1, 2, 5)...")
+        self.input_field.setStyleSheet("padding: 5px;")
+        self.input_field.setMinimumHeight(36)
+        self.input_field.returnPressed.connect(self.handle_new_command)
+        self.object_list.addItem(container_item)
+        self.object_list.setItemWidget(container_item, self.input_field)
+
+    def insert_object_to_sidepanel(self, index: int, element):
+        item = QListWidgetItem(self.object_list)
+        row_widget = ObjectPreviewWidget(element.content, self.object_list)
+        item.setSizeHint(row_widget.sizeHint())
+        self.object_list.setStyleSheet("""
+            QListWidget::item:selected {
+                background-color: transparent;
+                border: 2px solid palette(highlight);
+                border-radius: 5px;
+                color: palette(window-text);
+            }
+            QListWidget::item:hover {
+                background-color: rgba(128, 128, 128, 20);
+                border-radius: 5px;
+            }
+        """)
+        self.object_list.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.object_list.addItem(item)
+        self.object_list.insertItem(index, item)
+        self.object_list.setItemWidget(item, row_widget)
 
     def file_new_triggered(self):
         print("New File clicked!")
@@ -134,6 +154,11 @@ class MainWindow(QMainWindow):
 
     def file_save_triggered(self):
         print("Save File clicked!")
+
+    def handle_new_command(self):
+        raw_text = self.input_field.text().strip()
+        self.input_field.clear()
+        project.add_new_commands(raw_text)
 
     def zoom_in(self):
         self.canvas.zoom *= 1.25

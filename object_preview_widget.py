@@ -1,40 +1,75 @@
+from enum import Enum
+
 from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QColor, QGuiApplication, QPainter, QPixmap
+from PyQt6.QtSvg import QSvgRenderer
 from PyQt6.QtWidgets import (
+    QGraphicsOpacityEffect,
     QHBoxLayout,
     QLabel,
     QListWidget,
     QPushButton,
     QWidget,
 )
+from typing_extensions import Any
+
+
+class ObjectTypes(Enum):
+    POINT = "Point"
+    LINE = "Line"
+    PLANE = "Plane"
+    CIRCLE = "Circle"
+    UNKNOWN = "Unknown"
+
+
+icons = {
+    ObjectTypes.POINT: "point.svg",
+    ObjectTypes.LINE: "line.svg",
+    ObjectTypes.PLANE: "plane.svg",
+    ObjectTypes.CIRCLE: "circle.svg",
+}
+
+
+class ObjectPreviewType:
+    def __init__(
+        self, name: str, obj_type: ObjectTypes, viewstyle: str, params: Any, id: str
+    ):
+        self.name = name
+        self.obj_type = obj_type
+        self.viewstyle = viewstyle
+        self.params = params
+        self.id = id
 
 
 class ObjectPreviewWidget(QWidget):
     def __init__(
         self,
-        name: str,
-        obj_type: str,
+        content: ObjectPreviewType,
         parent_list: QListWidget,
-        name_type: str = "",
     ):
         super().__init__()
         self.parent_list = parent_list
-        self.name = name
-
+        self.content = content
         layout = QHBoxLayout(self)
         layout.setContentsMargins(10, 5, 10, 5)
         layout.setSpacing(15)
-
-        # Name (Bold)
-        if name_type == "hidden":
-            self.name_label = QLabel(name)
+        if self.content.obj_type == ObjectTypes.UNKNOWN:
+            self.type_label = QLabel("X")
         else:
-            self.name_label = QLabel(f"<b>{name}</b>")
+            self.type_label = QLabel()
+            pixmap = get_icon(self.content.obj_type)
+            self.type_label.setPixmap(pixmap)
+
+        self.name_label = QLabel(f"<b>{self.content.name}</b>")
 
         # Type (Dimmed/Grey)
-        self.type_label = QLabel(obj_type)
-        font = self.type_label.font()
+        self.params_label = QLabel(str(self.content.params))
+        font = self.params_label.font()
         font.setPointSize(12)
-        self.type_label.setFont(font)
+        opacity_effect = QGraphicsOpacityEffect()
+        opacity_effect.setOpacity(0.6)  # 60% visibility
+        self.params_label.setGraphicsEffect(opacity_effect)
+        self.params_label.setFont(font)
 
         # Three Dots Button
         self.menu_btn = QPushButton("⋮")
@@ -42,12 +77,34 @@ class ObjectPreviewWidget(QWidget):
         self.menu_btn.setFlat(True)
         self.menu_btn.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         # Add to layout
+        layout.addWidget(self.type_label)
         layout.addWidget(self.name_label)
         layout.addStretch()  # Pushes the type and dots to the right
-        layout.addWidget(self.type_label)
+        layout.addWidget(self.params_label)
         layout.addWidget(self.menu_btn)
 
         self.menu_btn.clicked.connect(self.on_menu_click)
 
     def on_menu_click(self):
-        print(f"Opening settings for {self.name}")
+        print(f"Opening settings for {self.content.id}")
+
+
+from PyQt6.QtCore import QRectF
+
+
+def get_icon(icon_name, size=24):
+    svg_path = icons[icon_name]
+    with open("static/icons/" + svg_path, "r") as f:
+        svg_data = f.read()
+    dpr = QGuiApplication.primaryScreen().devicePixelRatio()
+    pixmap = QPixmap(int(size * dpr), int(size * dpr))
+    pixmap.fill(Qt.GlobalColor.transparent)
+    pixmap.setDevicePixelRatio(dpr)
+    renderer = QSvgRenderer(svg_data.encode("utf-8"))
+    painter = QPainter(pixmap)
+    painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+    target_rect = QRectF(0, 0, size, size)
+    renderer.render(painter, target_rect)
+
+    painter.end()
+    return pixmap
