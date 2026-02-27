@@ -1,4 +1,5 @@
 import ast
+import math
 from typing import Any
 
 import create_objects
@@ -20,6 +21,7 @@ class Project:
         self.document = Document()
         self.history: list[Element] = []
         self.objects: dict[str, Point | Line | Circle | Plane] = {}
+        self.variables = {}
 
     def open(self, filepath):
         self.document.open(filepath)
@@ -29,26 +31,53 @@ class Project:
         self.add_new_commands(self.document.file)
 
     def add_new_commands(self, script: str):
-        tree = ast.parse(script)
+        try:
+            tree = ast.parse(script)
+        except SyntaxError as e:
+            print(f"Syntax error in script: {e}")
+            return None
+
         last_element = None
+        id = len(self.history)
+        safe_globals = {"math": math}
+
         for node in tree.body:
-            if isinstance(node, ast.Expr) and isinstance(node.value, ast.Call):
+            if isinstance(node, ast.Assign):
+                try:
+                    value_str = ast.unparse(node.value)
+                    value = eval(value_str, safe_globals, self.variables)
+                    for target in node.targets:
+                        if isinstance(target, ast.Name):
+                            self.variables[target.id] = value
+                except Exception as e:
+                    print(f"Failed to assign variable: {e}")
+            elif isinstance(node, ast.Expr) and isinstance(node.value, ast.Call):
                 func_name = node.value.func.id
+
                 if hasattr(create_objects, func_name):
                     try:
-                        args = [ast.literal_eval(arg) for arg in node.value.args]
-                        id = len(self.history)
+                        func = getattr(create_objects, func_name)
+
+                        args = []
+                        for arg_node in node.value.args:
+                            arg_str = ast.unparse(arg_node)
+                            arg_val = eval(arg_str, safe_globals, self.variables)
+                            args.append(arg_val)
+                        func(id, self.objects, *args)
                         element = Element(
                             id,
                             func_name,
                             args,
                             gen_content_from_args(id, func_name, args),
                         )
-                        print(element)
+                        last_element = element
                         self.history.append(element)
-                    except ValueError:
-                        pass
-        return element
+
+                    except Exception as e:
+                        print(f"Error executing command '{func_name}': {e}")
+                else:
+                    print(f"Unknown command: {func_name}")
+        return last_element
 
 
 def gen_content_from_args(id, cmd, args):

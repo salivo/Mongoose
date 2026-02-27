@@ -1,17 +1,20 @@
-from math import atan2, sqrt
 import math
+from math import atan2, sqrt
+
 import numpy as np
 
 
 class Point:
-    def __init__(self, cords: tuple[float, float], name: str):
+    def __init__(self, id: int, cords: tuple[float, float], name: str):
+        self.id = id
         self.x: float = -cords[0]
         self.y: float = cords[1]
         self.name: str = name
 
 
 class Line:
-    def __init__(self, p1: Point, p2: Point, name: str):
+    def __init__(self, id: int, p1: Point, p2: Point, name: str):
+        self.id = id
         self.p1: Point = p1
         self.p2: Point = p2
         self.name: str = name
@@ -23,12 +26,14 @@ class Line:
 class Circle:
     def __init__(
         self,
+        id: int,
         center: Point,
         radius: float,
         name: str,
         draw_from: float | None = None,
         draw_to: float | None = None,
     ):
+        self.id = id
         self.center: Point = center
         self.name: str = name
         self.radius: float = radius
@@ -39,29 +44,32 @@ class Circle:
 
 
 class Plane:
-    def __init__(self, cords: tuple[float, float | str, float | str], name: str):
-        self.p0: Point = Point((cords[0], 0), "_P" + name + "0")
+    def __init__(
+        self, id: int, cords: tuple[float, float | str, float | str], name: str
+    ):
+        self.id = id
+        self.p0: Point = Point(id, (cords[0], 0), "_P" + name + "0")
         if isinstance(cords[1], (float, int)):
-            self.p1: Point = Point((0, -cords[1]), "_P" + name + "1")
+            self.p1: Point = Point(id, (0, -cords[1]), "_P" + name + "1")
         else:
             if cords[1] == "infinity":
-                self.p1 = Point((cords[0], -cords[0]), "_P" + name + "1")
+                self.p1 = Point(id, (cords[0], -cords[0]), "_P" + name + "1")
             else:
                 raise ValueError("Invalid plane y coordinate")
 
         if isinstance(cords[2], (float, int)):
-            self.p2: Point = Point((0, cords[2]), "_P" + name + "2")
+            self.p2: Point = Point(id, (0, cords[2]), "_P" + name + "2")
         else:
             if cords[2] == "infinity":
-                self.p2 = Point((cords[0], cords[0]), "_P" + name + "2")
+                self.p2 = Point(id, (cords[0], cords[0]), "_P" + name + "2")
             else:
                 raise ValueError("Invalid plane z coordinate")
-        self.line1: Line = Line(self.p0, self.p1, name + "1")
-        self.line2: Line = Line(self.p0, self.p2, name + "2")
+        self.line1: Line = Line(id, self.p0, self.p1, name + "1")
+        self.line2: Line = Line(id, self.p0, self.p2, name + "2")
         self.name: str = name
 
 
-def foot_of_perp(line: Line, point: Point, name: str) -> Point:
+def foot_of_perp(id: int, line: Line, point: Point, name: str) -> Point:
     # Extract the coordinates
     A = (line.p1.x, line.p1.y)
     B = (line.p2.x, line.p2.y)
@@ -80,10 +88,11 @@ def foot_of_perp(line: Line, point: Point, name: str) -> Point:
         foot_xy = A_arr + t * v  # pyright: ignore[reportAny]
 
     # Return as a new Point
-    return Point((-foot_xy[0], foot_xy[1]), name)
+    return Point(id, (-foot_xy[0], foot_xy[1]), name)
 
 
 def perpendicular_point_from_distance(
+    id: int,
     base_point: Point,  # Point from which the perpendicular is drawn
     line: Line,  # Line to which the perpendicular is relative
     distance: float,  # Distance from base_point along perpendicular
@@ -102,10 +111,10 @@ def perpendicular_point_from_distance(
     perp_unit_y = perp_y / norm
     px = base_point.x + distance * perp_unit_x
     py = base_point.y + distance * perp_unit_y
-    return Point((-px, py), name)
+    return Point(id, (-px, py), name)
 
 
-def intersect_line2line(line1: Line, line2: Line, name: str) -> Point | None:
+def intersect_line2line(id: int, line1: Line, line2: Line, name: str) -> Point | None:
     x1, y1 = line1.p1.x, line1.p1.y
     x2, y2 = line1.p2.x, line1.p2.y
     x3, y3 = line2.p1.x, line2.p1.y
@@ -118,11 +127,11 @@ def intersect_line2line(line1: Line, line2: Line, name: str) -> Point | None:
     px = ((x1 * y2 - y1 * x2) * (x3 - x4) - (x1 - x2) * (x3 * y4 - y3 * x4)) / denom
     py = ((x1 * y2 - y1 * x2) * (y3 - y4) - (y1 - y2) * (x3 * y4 - y3 * x4)) / denom
 
-    return Point((-px, py), name)
+    return Point(id, (-px, py), name)
 
 
 def intersect_circle2line(
-    circle: Circle, line: Line, name: str, n: int
+    id: int, circle: Circle, line: Line, name: str, n: int
 ) -> Point | None:
     # Circle center and radius
     cx, cy = circle.center.x, circle.center.y
@@ -160,13 +169,13 @@ def intersect_circle2line(
 
     if 1 <= n <= len(intersections):
         px, py = intersections[n - 1]
-        return Point((-px, py), name)
+        return Point(id, (-px, py), name)
 
     return None
 
 
 def intersect_circle2circle(
-    circle1: Circle, circle2: Circle, name: str, n: int
+    id: int, circle1: Circle, circle2: Circle, name: str, n: int
 ) -> Point | None:
     x1, y1, r1 = circle1.center.x, circle1.center.y, circle1.radius
     x2, y2, r2 = circle2.center.x, circle2.center.y, circle2.radius
@@ -199,13 +208,13 @@ def intersect_circle2circle(
 
     if 1 <= n <= len(intersections):
         px, py = intersections[n - 1]
-        return Point((-px, py), name)
+        return Point(id, (-px, py), name)
 
     return None
 
 
 def parallel_point_by_distance(
-    base_point: Point, line_parallel_to: Line, distance: float, name: str
+    id: int, base_point: Point, line_parallel_to: Line, distance: float, name: str
 ) -> Point:
     vx = line_parallel_to.p2.x - line_parallel_to.p1.x
     vy = line_parallel_to.p2.y - line_parallel_to.p1.y
@@ -213,11 +222,13 @@ def parallel_point_by_distance(
     if norm == 0:
         raise ValueError("Reference line has zero length")
     ux, uy = vx / norm, vy / norm  # unit vector along the line
-    return Point((-base_point.x - distance * ux, base_point.y + distance * uy), name)
+    return Point(
+        id, (-base_point.x - distance * ux, base_point.y + distance * uy), name
+    )
 
 
 def parallel_point_by_line(
-    base_point: Point, line_parallel_to: Line, line_to: Line, name: str
+    id: int, base_point: Point, line_parallel_to: Line, line_to: Line, name: str
 ) -> Point | None:
     dx = line_parallel_to.p2.x - line_parallel_to.p1.x
     dy = line_parallel_to.p2.y - line_parallel_to.p1.y
@@ -225,12 +236,13 @@ def parallel_point_by_line(
         raise ValueError("line_parallel_to cannot be degenerate")
 
     parallel_line = Line(
+        id,
         base_point,
-        Point((-base_point.x - dx, base_point.y + dy), name + "_dir"),
+        Point(id, (-base_point.x - dx, base_point.y + dy), name + "_dir"),
         "temp_parallel",
     )
 
-    return intersect_line2line(parallel_line, line_to, name)
+    return intersect_line2line(id, parallel_line, line_to, name)
 
 
 def angle_to_horizontal(p1: Point, p2: Point):
@@ -246,7 +258,7 @@ def measure_point2point_distance(p1: Point, p2: Point):
 
 
 def generatePolygonPoints(
-    center: Point, start: Point, n: int
+    id: int, center: Point, start: Point, n: int
 ) -> list[tuple[float, float]]:
     cx, cy = center.x, center.y
     sx, sy = start.x, start.y

@@ -1,5 +1,6 @@
+d = 5*2
 # Points
-createPoint((1,2,5), "A")
+createPoint((1,2,d), "A")
 createPoint((3,1,0), "B")
 createPoint((-2,1,None), "C")
 createPoint((0,1,None), "D")

@@ -1,7 +1,7 @@
 from enum import Enum
 
-from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QColor, QGuiApplication, QPainter, QPixmap
+from PyQt6.QtCore import QRectF, Qt
+from PyQt6.QtGui import QGuiApplication, QPainter, QPixmap
 from PyQt6.QtSvg import QSvgRenderer
 from PyQt6.QtWidgets import (
     QGraphicsOpacityEffect,
@@ -87,9 +87,6 @@ class ObjectPreviewWidget(QWidget):
 
     def on_menu_click(self):
         print(f"Opening settings for {self.content.id}")
-
-
-from PyQt6.QtCore import QRectF
 
 
 def get_icon(icon_name, size=24):

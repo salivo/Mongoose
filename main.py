@@ -1,26 +1,23 @@
-import cmd
 import sys
-from typing import override
 
 from PyQt6.QtCore import QPointF, Qt
-from PyQt6.QtGui import QAction, QWheelEvent
+from PyQt6.QtGui import QAction
 from PyQt6.QtWidgets import (
     QAbstractItemView,
     QApplication,
     QDockWidget,
-    QHeaderView,
     QLineEdit,
     QListWidget,
     QListWidgetItem,
     QMainWindow,
-    QTableWidget,
     QVBoxLayout,
     QWidget,
 )
 
 from canvas import DrawingCanvas
-from geometry_math import Circle, Line, Plane, Point
+from geometry_math import Line
 from object_preview_widget import ObjectPreviewWidget
+from parameters_input_popup import LineSetParamsPopup, PointSetParamsPopup
 from project import Project
 
 project = Project()
@@ -29,52 +26,52 @@ project = Project()
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.sencetivity = 1
-        self.zoom_in_factor = 1.1
         central_widget = QWidget()
         self.last_mouse_pos = QPointF()
         self.setCentralWidget(central_widget)
         layout = QVBoxLayout(central_widget)
         layout.setContentsMargins(0, 0, 0, 0)
+        self.init_objects_panel()
+        self.init_menubar()
         self.canvas = DrawingCanvas(project.objects)
         layout.addWidget(self.canvas)
-        self.init_menubar()
-        self.init_objects_panel()
+        self.input_field.clearFocus()
 
-    @override
-    def wheelEvent(self, a0: QWheelEvent | None):
+    def keyPressEvent(self, a0):
         if a0 is None:
             return
-        mouse_pos = a0.position()
-        factor = (
-            self.zoom_in_factor if a0.angleDelta().y() > 0 else 1 / self.zoom_in_factor
-        )
-        center = QPointF(self.canvas.width() / 2, self.canvas.height() / 2)
-        relative_pos = mouse_pos - (center + self.canvas.offset)
-        self.canvas.offset -= relative_pos * (factor - 1)
-        self.canvas.zoom *= factor
-        self.canvas.update()
-        a0.accept()
-
-    @override
-    def mouseMoveEvent(self, a0):
-        if a0 is None:
-            return
-        event = a0
-        if event.buttons() & Qt.MouseButton.MiddleButton:
-            current_pos = event.position()
-            delta = current_pos - self.last_mouse_pos
-            self.canvas.offset += delta * self.sencetivity
-            self.last_mouse_pos = current_pos
-            self.update()
-            event.accept()
-
-    def mousePressEvent(self, a0):
-        if a0 is None:
-            return
-        if a0.button() == Qt.MouseButton.MiddleButton:
-            self.last_mouse_pos = a0.position()
-            a0.accept()
+        if a0.key() == Qt.Key.Key_P:
+            popup = PointSetParamsPopup()
+            if popup.exec():
+                name = popup.name_input.text()
+                x_value = popup.x_input.value()
+                y_value = popup.y_input.value()
+                z_value = popup.z_input.value()
+                element = project.add_new_commands(
+                    f"createPoint(({x_value}, {y_value}, {z_value}), '{name}')"
+                )
+                if element is None:
+                    return
+                self.insert_object_to_sidepanel(self.object_list.count() - 1, element)
+                self.object_list.update()
+        if a0.key() == Qt.Key.Key_L:
+            if len(self.canvas.selected_objs) == 2:
+                popup = LineSetParamsPopup()
+                if popup.exec():
+                    name = popup.name_input.text()
+                    p1 = self.canvas.selected_objs[0]
+                    p2 = self.canvas.selected_objs[1]
+                element = project.add_new_commands(
+                    f"createLine('{p1}', '{p2}', '{name}')"
+                )
+                if element is None:
+                    return
+                self.insert_object_to_sidepanel(self.object_list.count() - 1, element)
+                self.object_list.update()
+        if a0.key() == Qt.Key.Key_Escape:
+            if self.input_field.hasFocus():
+                self.input_field.clearFocus()
+        super().keyPressEvent(a0)
 
     def init_menubar(self):
         menubar = self.menuBar()
@@ -99,12 +96,15 @@ class MainWindow(QMainWindow):
         exit_action.triggered.connect(self.close)
         file_menu.addSeparator()
         file_menu.addAction(exit_action)
-        edit_menu = menubar.addMenu("&Edit")
-        if not edit_menu:
-            return
-        zoom_in_action = QAction("Zoom In", self)
-        zoom_in_action.triggered.connect(self.zoom_in)
-        edit_menu.addAction(zoom_in_action)
+
+    def file_new_triggered(self):
+        print("New File clicked!")
+
+    def file_open_triggered(self):
+        print("Open File clicked!")
+
+    def file_save_triggered(self):
+        print("Save File clicked!")
 
     def init_objects_panel(self):
         self.dock = QDockWidget("Objects", self)
@@ -126,7 +126,7 @@ class MainWindow(QMainWindow):
         self.object_list.setItemWidget(container_item, self.input_field)
 
     def insert_object_to_sidepanel(self, index: int, element):
-        item = QListWidgetItem(self.object_list)
+        item = QListWidgetItem()
         row_widget = ObjectPreviewWidget(element.content, self.object_list)
         item.setSizeHint(row_widget.sizeHint())
         self.object_list.setStyleSheet("""
@@ -142,27 +142,24 @@ class MainWindow(QMainWindow):
             }
         """)
         self.object_list.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-        self.object_list.addItem(item)
         self.object_list.insertItem(index, item)
         self.object_list.setItemWidget(item, row_widget)
-
-    def file_new_triggered(self):
-        print("New File clicked!")
-
-    def file_open_triggered(self):
-        print("Open File clicked!")
-
-    def file_save_triggered(self):
-        print("Save File clicked!")
 
     def handle_new_command(self):
         raw_text = self.input_field.text().strip()
         self.input_field.clear()
-        project.add_new_commands(raw_text)
+        if project.add_new_commands(raw_text) is None:
+            return
+        self.insert_object_to_sidepanel(
+            self.object_list.count() - 1, project.add_new_commands(raw_text)
+        )
+        self.object_list.update()
 
-    def zoom_in(self):
-        self.canvas.zoom *= 1.25
-        self.canvas.update()
+    def showEvent(self, a0):
+        if a0 is None:
+            return
+        super().showEvent(a0)
+        self.canvas.setFocus()
 
 
 if __name__ == "__main__":

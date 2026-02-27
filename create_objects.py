@@ -18,32 +18,34 @@ from geometry_math import (
 )
 
 
-def createPoint(objects, cords: tuple[float, float | None, float | None], name: str):
+def createPoint(
+    id, objects, cords: tuple[float, float | None, float | None], name: str
+):
     if cords[1] is not None:
-        p1 = Point((cords[0], -cords[1]), name + "1")
+        p1 = Point(id, (cords[0], -cords[1]), name + "1")
         objects[name + "1"] = p1
     if cords[2] is not None:
-        p2 = Point((cords[0], cords[2]), name + "2")
+        p2 = Point(id, (cords[0], cords[2]), name + "2")
         objects[name + "2"] = p2
 
 
-def createLine(objects, p1_name: str, p2_name: str, name: str):
+def createLine(id, objects, p1_name: str, p2_name: str, name: str):
     p1 = objects[p1_name]
     p2 = objects[p2_name]
     if type(p1) is Point and type(p2) is Point:
-        line = Line(p1, p2, name)
+        line = Line(id, p1, p2, name)
         objects[name] = line
 
 
-def createCircle(objects, p_name: str, radius: float, name: str):
+def createCircle(id, objects, p_name: str, radius: float, name: str):
     p = objects[p_name]
     if type(p) is Point:
-        circle = Circle(p, radius, name)
+        circle = Circle(id, p, radius, name)
         objects[name] = circle
 
 
-def createPlane(objects, cords: tuple[float, float | str, float | str], name: str):
-    plane = Plane(cords, name)
+def createPlane(id, objects, cords: tuple[float, float | str, float | str], name: str):
+    plane = Plane(id, cords, name)
     objects[name] = plane
     objects[name + "1"] = plane.line1
     objects[name + "2"] = plane.line2
@@ -79,40 +81,40 @@ def setCircleDrawRange(objects, circle: str, point_from: str, point_to: str):
     circle_obj.draw_to = degrees(angle_to_horizontal(circle_obj.center, point_to_obj))
 
 
-def footToLine(objects, point: str, line: str, name: str):
+def footToLine(id, objects, point: str, line: str, name: str):
     point_obj = objects[point]
     line_obj = objects[line]
     if type(point_obj) is not Point or type(line_obj) is not Line:
         return
-    objects[name] = foot_of_perp(line_obj, point_obj, name)
+    objects[name] = foot_of_perp(id, line_obj, point_obj, name)
 
 
 def createPerpFromPoint(
-    objects, point: str, line: str, distance: float, name: str
+    id, objects, point: str, line: str, distance: float, name: str
 ) -> Point | None:
     point_obj = objects[point]
     line_obj = objects[line]
     if type(point_obj) is not Point or type(line_obj) is not Line:
         print("Invalid Line or Point")
         return
-    p = perpendicular_point_from_distance(point_obj, line_obj, distance, name)
+    p = perpendicular_point_from_distance(id, point_obj, line_obj, distance, name)
     if p is None:
         print("Cannot create perpendicular point")
         return
     objects[name] = p
 
 
-def intersect(objects, obj1: str, obj2: str, name: str, n: int = 1):
+def intersect(id, objects, obj1: str, obj2: str, name: str, n: int = 1):
     a = objects[obj1]
     b = objects[obj2]
     if isinstance(a, Line) and isinstance(b, Line):
-        p = intersect_line2line(a, b, name)
+        p = intersect_line2line(id, a, b, name)
     elif isinstance(a, Circle) and isinstance(b, Circle):
-        p = intersect_circle2circle(a, b, name, n)
+        p = intersect_circle2circle(id, a, b, name, n)
     elif isinstance(a, Circle) and isinstance(b, Line):
-        p = intersect_circle2line(a, b, name, n)
+        p = intersect_circle2line(id, a, b, name, n)
     elif isinstance(a, Line) and isinstance(b, Circle):
-        p = intersect_circle2line(b, a, name, n)
+        p = intersect_circle2line(id, b, a, name, n)
     else:
         print("Unsupported types for intersection")
         return
@@ -122,7 +124,7 @@ def intersect(objects, obj1: str, obj2: str, name: str, n: int = 1):
 
 
 def parallel(
-    objects, base_point: str, line_parallel_to: str, offset: str | int, name: str
+    id, objects, base_point: str, line_parallel_to: str, offset: str | int, name: str
 ):
     p = objects[base_point]
     line = objects[line_parallel_to]
@@ -131,15 +133,17 @@ def parallel(
     if isinstance(offset, str):
         lineto = objects[offset]
         if isinstance(lineto, Line):
-            result = parallel_point_by_line(p, line, lineto, name)
+            result = parallel_point_by_line(id, p, line, lineto, name)
             if result is None:
                 return
             objects[name] = result
     else:
-        objects[name] = parallel_point_by_distance(p, line, offset, name)
+        objects[name] = parallel_point_by_distance(id, p, line, offset, name)
 
 
-def findPointWithPlane(objects, point: str, plane: str, new_name: str | None = None):
+def findPointWithPlane(
+    id, objects, point: str, plane: str, new_name: str | None = None
+):
     if point not in objects or plane not in objects:
         return
     pointobj = objects[point]
@@ -148,36 +152,36 @@ def findPointWithPlane(objects, point: str, plane: str, new_name: str | None = N
         return
     newname = pointobj.name
 
-    p1 = parallel_point_by_line(pointobj, org_y, org_x, "")
+    p1 = parallel_point_by_line(id, pointobj, org_y, org_x, "")
     if p1 is None:
         return
 
     if pointobj.name.endswith("1"):
         newname = pointobj.name[:-1] + "2"
-        p2 = parallel_point_by_line(pointobj, planeobj.line1, org_x, "")
+        p2 = parallel_point_by_line(id, pointobj, planeobj.line1, org_x, "")
         if p2 is None:
             return
-        p3 = parallel_point_by_line(p2, org_y, planeobj.line2, "")
+        p3 = parallel_point_by_line(id, p2, org_y, planeobj.line2, "")
 
     elif pointobj.name.endswith("2"):
         newname = pointobj.name[:-1] + "1"
-        p2 = parallel_point_by_line(pointobj, planeobj.line2, org_x, "")
+        p2 = parallel_point_by_line(id, pointobj, planeobj.line2, org_x, "")
         if p2 is None:
             return
-        p3 = parallel_point_by_line(p2, org_y, planeobj.line1, "")
+        p3 = parallel_point_by_line(id, p2, org_y, planeobj.line1, "")
     else:
         raise ValueError(f"Name {pointobj.name} has no 1/2 suffix")
     if not p3:
         return
     if new_name:
         newname = new_name
-    result = parallel_point_by_line(p3, org_x, Line(pointobj, p1, ""), newname)
+    result = parallel_point_by_line(id, p3, org_x, Line(id, pointobj, p1, ""), newname)
     if result is None:
         return
     objects[newname] = result
 
 
-def measureDistance(objects, obj1: str, obj2: str | None = None):
+def measureDistance(id, objects, obj1: str, obj2: str | None = None):
     object1 = objects[obj1]
     if type(object1) is Line:
         return measure_point2point_distance(object1.p1, object1.p2)
@@ -188,13 +192,13 @@ def measureDistance(objects, obj1: str, obj2: str | None = None):
         return measure_point2point_distance(object1, object2)
 
 
-def createPolygon(objects, center: str, startpoint: str, points: list[str]):
+def createPolygon(id, objects, center: str, startpoint: str, points: list[str]):
     center_obj = objects[center]
     startpoint_obj = objects[startpoint]
     if type(center_obj) is not Point or type(startpoint_obj) is not Point:
         return None
     n = len(points) + 1
-    polygon_points = generatePolygonPoints(center_obj, startpoint_obj, n)
+    polygon_points = generatePolygonPoints(id, center_obj, startpoint_obj, n)
     for coord, name in zip(polygon_points[1:], points):
-        p = Point(coord, name)
+        p = Point(id, coord, name)
         objects[name] = p
