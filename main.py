@@ -39,6 +39,13 @@ class MainWindow(QMainWindow):
         self.canvas.selection_changed.connect(self.sync_list_selection)
         self.input_field.clearFocus()
 
+    def closeEvent(self, a0):
+        if a0 is None:
+            return
+        if not self.maybe_save():
+            a0.ignore()
+        a0.accept()
+
     def keyPressEvent(self, a0):
         if a0 is None:
             return

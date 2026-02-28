@@ -31,6 +31,7 @@ class Project:
         if self.document.file is None:
             return
         self.add_new_commands(self.document.file)
+        self.is_dirty = False
 
     def new(self):
         self.is_dirty = False
