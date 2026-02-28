@@ -9,11 +9,19 @@ from object_preview_widget import ObjectPreviewType, ObjectTypes
 
 
 class Element:
-    def __init__(self, id: int, cmd: str, args: list[Any], content: ObjectPreviewType):
+    def __init__(
+        self,
+        id: int,
+        cmd: str,
+        args: list[Any],
+        content: ObjectPreviewType,
+        source: str,
+    ):
         self.id = id
         self.cmd = cmd
         self.args = args
         self.content = content
+        self.source = source
 
 
 class Project:
@@ -22,8 +30,10 @@ class Project:
         self.history: list[Element] = []
         self.objects: dict[str, Point | Line | Circle | Plane] = {}
         self.variables = {}
-        self.next_id = 0
+        self.next_id = 2
         self.is_dirty = False
+        self.objects["org_x"] = create_objects.org_x
+        self.objects["org_y"] = create_objects.org_y
 
     def open(self, filepath):
         self.new()
@@ -39,7 +49,9 @@ class Project:
         self.history.clear()
         self.objects.clear()
         self.variables.clear()
-        self.next_id = 0
+        self.objects["org_x"] = create_objects.org_x
+        self.objects["org_y"] = create_objects.org_y
+        self.next_id = 2
 
     def add_new_commands(self, script: str):
         self.is_dirty = True
@@ -50,11 +62,20 @@ class Project:
             return None
 
         last_element = None
-        safe_globals = {"math": math}
+        safe_globals = {
+            "math": math,
+            "org_x": create_objects.org_x,
+            "org_y": create_objects.org_y,
+            "getObject": lambda name: create_objects.getObject(id, self.objects, name),
+            "measureDistance": lambda obj1, obj2=None: create_objects.measureDistance(
+                id, self.objects, obj1, obj2
+            ),
+        }
 
         for node in tree.body:
             id = self.next_id
             self.next_id += 1
+            line_source = ast.unparse(node)
             if isinstance(node, ast.Assign):
                 try:
                     value_str = ast.unparse(node.value)
@@ -62,6 +83,15 @@ class Project:
                     for target in node.targets:
                         if isinstance(target, ast.Name):
                             self.variables[target.id] = value
+                    element = Element(
+                        id,
+                        "ASSIGN",
+                        [],
+                        ObjectPreviewType("var", ObjectTypes.UNKNOWN, "", "", ""),
+                        line_source,
+                    )
+                    self.history.append(element)
+                    last_element = element
                 except Exception as e:
                     print(f"Failed to assign variable: {e}")
             elif isinstance(node, ast.Expr) and isinstance(node.value, ast.Call):
@@ -82,6 +112,7 @@ class Project:
                             func_name,
                             args,
                             gen_content_from_args(id, func_name, args),
+                            line_source,
                         )
                         last_element = element
                         self.history.append(element)
@@ -95,16 +126,22 @@ class Project:
     def save(self):
         self.is_dirty = False
         script_lines = []
-        for el in self.history:
-            formatted_args = []
-            for arg in el.args:
-                if isinstance(arg, str):
-                    formatted_args.append(f"'{arg}'")
-                else:
-                    formatted_args.append(str(arg))
 
-            line = f"{el.cmd}({', '.join(formatted_args)})"
-            script_lines.append(line)
+        for el in self.history:
+            if el.source:
+                script_lines.append(el.source)
+            else:
+                if el.cmd == "ASSIGN":
+                    continue
+                formatted_args = []
+                for arg in el.args:
+                    if isinstance(arg, str):
+                        formatted_args.append(f"'{arg}'")
+                    else:
+                        formatted_args.append(str(arg))
+
+                line = f"{el.cmd}({', '.join(formatted_args)})"
+                script_lines.append(line)
 
         self.document.file = "\n".join(script_lines)
         self.document.save()

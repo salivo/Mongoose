@@ -31,14 +31,14 @@ class Circle:
         radius: float,
         name: str,
         draw_from: float | None = None,
-        draw_to: float | None = None,
+        draw_span: float | None = None,
     ):
         self.id = id
         self.center: Point = center
         self.name: str = name
         self.radius: float = radius
         self.draw_from: float | None = draw_from
-        self.draw_to: float | None = draw_to
+        self.draw_span: float | None = draw_span
         self.type: str = "construct"
         self.style: str = "normal"
 

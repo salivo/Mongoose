@@ -19,6 +19,7 @@ class ObjectTypes(Enum):
     LINE = "Line"
     PLANE = "Plane"
     CIRCLE = "Circle"
+    VARIABLE = "Variable"
     UNKNOWN = "Unknown"
 
 

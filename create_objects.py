@@ -17,6 +17,15 @@ from geometry_math import (
     perpendicular_point_from_distance,
 )
 
+org_x: Line = Line(
+    0, Point(0, (-10, 0), "ORG_X_1"), Point(0, (10, 0), "ORG_X_1"), "org_x"
+)
+org_x.type = "none"
+org_y: Line = Line(
+    1, Point(1, (0, -10), "ORG_Y_1"), Point(1, (0, 10), "ORG_Y_1"), "org_y"
+)
+org_y.type = "none"
+
 
 def createPoint(
     id, objects, cords: tuple[float, float | None, float | None], name: str
@@ -65,20 +74,24 @@ def setStyle(objects, obj: str, line_style: str):
     object.style = line_style
 
 
-def setCircleDrawRange(objects, circle: str, point_from: str, point_to: str):
+def setCircleDrawRange(id: int, objects, circle: str, point_from: str, point_to: str):
     circle_obj = objects[circle]
     point_from_obj = objects[point_from]
     point_to_obj = objects[point_to]
     if (
-        type(circle_obj) is not Circle
-        or type(point_from_obj) is not Point
-        or type(point_to_obj) is not Point
+        not isinstance(circle_obj, Circle)
+        or not isinstance(point_from_obj, Point)
+        or not isinstance(point_to_obj, Point)
     ):
         return
-    circle_obj.draw_from = degrees(
-        angle_to_horizontal(circle_obj.center, point_from_obj)
-    )
-    circle_obj.draw_to = degrees(angle_to_horizontal(circle_obj.center, point_to_obj))
+    start_angle = degrees(angle_to_horizontal(circle_obj.center, point_from_obj))
+    end_angle = degrees(angle_to_horizontal(circle_obj.center, point_to_obj))
+    draw_span = end_angle - start_angle
+    if draw_span < 0:
+        draw_span += 360
+
+    circle_obj.draw_from = start_angle
+    circle_obj.draw_span = draw_span
 
 
 def footToLine(id, objects, point: str, line: str, name: str):
@@ -202,3 +215,7 @@ def createPolygon(id, objects, center: str, startpoint: str, points: list[str]):
     for coord, name in zip(polygon_points[1:], points):
         p = Point(id, coord, name)
         objects[name] = p
+
+
+def getObject(id, objects, name: str):
+    return objects[name]

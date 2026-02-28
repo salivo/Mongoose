@@ -17,6 +17,7 @@ from PyQt6.QtWidgets import (
 )
 
 from canvas import DrawingCanvas
+from geometry_math import Point
 from object_preview_widget import ObjectPreviewWidget
 from parameters_input_popup import LineSetParamsPopup, PointSetParamsPopup
 from project import Project
@@ -65,6 +66,12 @@ class MainWindow(QMainWindow):
                 self.object_list.update()
         if a0.key() == Qt.Key.Key_L:
             if len(self.canvas.selected_objs) == 2:
+                if not isinstance(
+                    project.objects[self.canvas.selected_objs[0]], Point
+                ) or not isinstance(
+                    project.objects[self.canvas.selected_objs[1]], Point
+                ):
+                    return
                 popup = LineSetParamsPopup()
                 if popup.exec():
                     name = popup.name_input.text()
@@ -92,6 +99,9 @@ class MainWindow(QMainWindow):
         if a0.key() == Qt.Key.Key_Escape:
             if self.input_field.hasFocus():
                 self.input_field.clearFocus()
+            self.canvas.selected_objs.clear()
+            self.canvas.update()
+            self.object_list.clearSelection()
         super().keyPressEvent(a0)
 
     def init_menubar(self):
