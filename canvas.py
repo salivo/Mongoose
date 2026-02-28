@@ -7,7 +7,13 @@ from PyQt6.QtWidgets import QWidget
 
 from geometry_math import Circle, Line, Point
 
-style = {"normal": 1, "bold": 3}
+style = {"normal": 0.2, "bold": 0.6}
+type = {
+    "construct": Qt.PenStyle.SolidLine,
+    "hidden": Qt.PenStyle.DashLine,
+    "realsized": Qt.PenStyle.DashDotLine,
+    "none": Qt.PenStyle.NoPen,
+}
 
 
 class DrawingCanvas(QWidget):
@@ -195,8 +201,8 @@ class DrawingCanvas(QWidget):
 
     def draw_point(self, painter: QPainter, point: Point, is_hovered: bool):
         color = QColor(255, 165, 0) if is_hovered else QColor(0, 0, 255)
-        thickness = 0.8 * self.mm_to_px if is_hovered else 0.5 * self.mm_to_px
-        pen = QPen(color, thickness)
+        thickness = 0.8 if is_hovered else 0.5
+        pen = QPen(color, thickness * self.mm_to_px)
         pen.setCapStyle(Qt.PenCapStyle.RoundCap)
         painter.setPen(pen)
         painter.drawPoint(
@@ -208,8 +214,9 @@ class DrawingCanvas(QWidget):
 
     def draw_line(self, painter: QPainter, line: Line, is_hovered: bool):
         color = QColor(255, 165, 0) if is_hovered else QColor(0, 0, 0)
-        thickness = style[line.style] + 0.5 if is_hovered else style[line.style]
-        pen = QPen(color, thickness)
+        thickness = style[line.style] + 0.2 if is_hovered else style[line.style]
+        pen = QPen(color, thickness * self.mm_to_px)
+        pen.setStyle(type[line.type])
         pen.setCapStyle(Qt.PenCapStyle.RoundCap)
         painter.setPen(pen)
         painter.drawLine(
@@ -221,8 +228,9 @@ class DrawingCanvas(QWidget):
 
     def draw_circle(self, painter: QPainter, circle: Circle, is_hovered: bool):
         color = QColor(255, 165, 0) if is_hovered else QColor(0, 0, 0)
-        thickness = 1.5 if is_hovered else 1
-        pen = QPen(color, thickness)
+        thickness = style[circle.style] + 0.2 if is_hovered else style[circle.style]
+        pen = QPen(color, thickness * self.mm_to_px)
+        pen.setStyle(type[circle.type])
         pen.setCapStyle(Qt.PenCapStyle.RoundCap)
         painter.setPen(pen)
         draw_from = 0

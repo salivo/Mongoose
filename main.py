@@ -262,6 +262,7 @@ class MainWindow(QMainWindow):
             return
         self.insert_object_to_sidepanel(element)
         self.object_list.update()
+        self.canvas.update
 
     def showEvent(self, a0):
         if a0 is None:

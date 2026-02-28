@@ -91,7 +91,9 @@ class Project:
                         id,
                         "ASSIGN",
                         [],
-                        ObjectPreviewType("var", ObjectTypes.UNKNOWN, "", "", ""),
+                        ObjectPreviewType(
+                            line_source, ObjectTypes.VARIABLE, "", "", ""
+                        ),
                         line_source,
                     )
                     self.history.append(element)
