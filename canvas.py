@@ -7,6 +7,8 @@ from PyQt6.QtWidgets import QWidget
 
 from geometry_math import Circle, Line, Point
 
+style = {"normal": 1, "bold": 3}
+
 
 class DrawingCanvas(QWidget):
     selection_changed = pyqtSignal(list)
@@ -206,7 +208,7 @@ class DrawingCanvas(QWidget):
 
     def draw_line(self, painter: QPainter, line: Line, is_hovered: bool):
         color = QColor(255, 165, 0) if is_hovered else QColor(0, 0, 0)
-        thickness = 1.5 if is_hovered else 1
+        thickness = style[line.style] + 0.5 if is_hovered else style[line.style]
         pen = QPen(color, thickness)
         pen.setCapStyle(Qt.PenCapStyle.RoundCap)
         painter.setPen(pen)

@@ -206,7 +206,8 @@ class MainWindow(QMainWindow):
         self.object_list.addItem(container_item)
         self.object_list.setItemWidget(container_item, self.input_field)
         for element in project.history:
-            self.insert_object_to_sidepanel(element)
+            if element.show_in_ui:
+                self.insert_object_to_sidepanel(element)
 
     def sync_list_selection(self, selected_keys):
         self.object_list.blockSignals(True)

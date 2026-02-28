@@ -16,12 +16,14 @@ class Element:
         args: list[Any],
         content: ObjectPreviewType,
         source: str,
+        show_in_ui: bool = True,
     ):
         self.id = id
         self.cmd = cmd
         self.args = args
         self.content = content
         self.source = source
+        self.show_in_ui = show_in_ui
 
 
 class Project:
@@ -66,10 +68,12 @@ class Project:
             "math": math,
             "org_x": create_objects.org_x,
             "org_y": create_objects.org_y,
-            "getObject": lambda name: create_objects.getObject(id, self.objects, name),
+            "getObject": lambda name: create_objects.getObject(self.objects, name),
             "measureDistance": lambda obj1, obj2=None: create_objects.measureDistance(
-                id, self.objects, obj1, obj2
+                self.objects, obj1, obj2
             ),
+            "setType": create_objects.setType,
+            "setStyle": create_objects.setStyle,
         }
 
         for node in tree.body:
@@ -96,31 +100,37 @@ class Project:
                     print(f"Failed to assign variable: {e}")
             elif isinstance(node, ast.Expr) and isinstance(node.value, ast.Call):
                 func_name = node.value.func.id
-
-                if hasattr(create_objects, func_name):
-                    try:
+                show_in_ui = True
+                try:
+                    args = []
+                    for arg_node in node.value.args:
+                        arg_str = ast.unparse(arg_node)
+                        arg_val = eval(arg_str, safe_globals, self.variables)
+                        args.append(arg_val)
+                    if func_name in safe_globals:
+                        func = safe_globals[func_name]
+                        func(self.objects, *args)
+                        show_in_ui = False
+                    elif hasattr(create_objects, func_name):
                         func = getattr(create_objects, func_name)
-
-                        args = []
-                        for arg_node in node.value.args:
-                            arg_str = ast.unparse(arg_node)
-                            arg_val = eval(arg_str, safe_globals, self.variables)
-                            args.append(arg_val)
                         func(id, self.objects, *args)
-                        element = Element(
-                            id,
-                            func_name,
-                            args,
-                            gen_content_from_args(id, func_name, args),
-                            line_source,
-                        )
+                    else:
+                        print(f"Unknown command: {func_name}")
+                        continue
+                    element = Element(
+                        id,
+                        func_name,
+                        args,
+                        gen_content_from_args(id, func_name, args),
+                        line_source,
+                        show_in_ui,
+                    )
+                    self.history.append(element)
+                    if show_in_ui:
                         last_element = element
-                        self.history.append(element)
 
-                    except Exception as e:
-                        print(f"Error executing command '{func_name}': {e}")
-                else:
-                    print(f"Unknown command: {func_name}")
+                except Exception as e:
+                    print(f"Error executing command '{func_name}': {e}")
         return last_element
 
     def save(self):

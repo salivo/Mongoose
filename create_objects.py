@@ -194,7 +194,7 @@ def findPointWithPlane(
     objects[newname] = result
 
 
-def measureDistance(id, objects, obj1: str, obj2: str | None = None):
+def measureDistance(objects, obj1: str, obj2: str | None = None):
     object1 = objects[obj1]
     if type(object1) is Line:
         return measure_point2point_distance(object1.p1, object1.p2)
@@ -217,5 +217,5 @@ def createPolygon(id, objects, center: str, startpoint: str, points: list[str]):
         objects[name] = p
 
 
-def getObject(id, objects, name: str):
+def getObject(objects, name: str):
     return objects[name]
