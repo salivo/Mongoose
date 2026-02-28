@@ -22,6 +22,7 @@ class Project:
         self.history: list[Element] = []
         self.objects: dict[str, Point | Line | Circle | Plane] = {}
         self.variables = {}
+        self.next_id = 10
 
     def open(self, filepath):
         self.document.open(filepath)
@@ -38,10 +39,11 @@ class Project:
             return None
 
         last_element = None
-        id = len(self.history)
         safe_globals = {"math": math}
 
         for node in tree.body:
+            id = self.next_id
+            self.next_id += 1
             if isinstance(node, ast.Assign):
                 try:
                     value_str = ast.unparse(node.value)
@@ -78,6 +80,15 @@ class Project:
                 else:
                     print(f"Unknown command: {func_name}")
         return last_element
+
+    def remove_element(self, target_id: int):
+        self.history = [el for el in self.history if el.id != target_id]
+        keys_to_delete = []
+        for key, obj in self.objects.items():
+            if hasattr(obj, "id") and obj.id == target_id:
+                keys_to_delete.append(key)
+        for key in keys_to_delete:
+            del self.objects[key]
 
 
 def gen_content_from_args(id, cmd, args):

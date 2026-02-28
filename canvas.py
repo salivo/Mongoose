@@ -1,7 +1,7 @@
 import math
 from typing import override
 
-from PyQt6.QtCore import QPointF, Qt
+from PyQt6.QtCore import QPointF, Qt, pyqtSignal
 from PyQt6.QtGui import QColor, QPainter, QPen, QWheelEvent
 from PyQt6.QtWidgets import QWidget
 
@@ -9,6 +9,8 @@ from geometry_math import Circle, Line, Plane, Point
 
 
 class DrawingCanvas(QWidget):
+    selection_changed = pyqtSignal(list)
+
     def __init__(self, objects):
         super().__init__()
         self.setMinimumSize(400, 300)
@@ -56,7 +58,6 @@ class DrawingCanvas(QWidget):
             return
         if a0.button() == Qt.MouseButton.MiddleButton:
             self.last_mouse_pos = a0.position()
-            a0.accept()
         if a0.button() == Qt.MouseButton.LeftButton:
             if self.hovered_obj is not None:
                 if a0.modifiers() & Qt.KeyboardModifier.ControlModifier:
@@ -66,8 +67,9 @@ class DrawingCanvas(QWidget):
                     self.selected_objs.append(self.hovered_obj)
             else:
                 self.selected_objs.clear()
-            self.update()
-            a0.accept()
+        self.selection_changed.emit(self.selected_objs)
+        self.update()
+        a0.accept()
 
     @override
     def mouseMoveEvent(self, a0):

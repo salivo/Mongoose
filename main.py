@@ -15,7 +15,6 @@ from PyQt6.QtWidgets import (
 )
 
 from canvas import DrawingCanvas
-from geometry_math import Line
 from object_preview_widget import ObjectPreviewWidget
 from parameters_input_popup import LineSetParamsPopup, PointSetParamsPopup
 from project import Project
@@ -35,6 +34,7 @@ class MainWindow(QMainWindow):
         self.init_menubar()
         self.canvas = DrawingCanvas(project.objects)
         layout.addWidget(self.canvas)
+        self.canvas.selection_changed.connect(self.sync_list_selection)
         self.input_field.clearFocus()
 
     def keyPressEvent(self, a0):
@@ -52,7 +52,7 @@ class MainWindow(QMainWindow):
                 )
                 if element is None:
                     return
-                self.insert_object_to_sidepanel(self.object_list.count() - 1, element)
+                self.insert_object_to_sidepanel(element)
                 self.object_list.update()
         if a0.key() == Qt.Key.Key_L:
             if len(self.canvas.selected_objs) == 2:
@@ -61,13 +61,25 @@ class MainWindow(QMainWindow):
                     name = popup.name_input.text()
                     p1 = self.canvas.selected_objs[0]
                     p2 = self.canvas.selected_objs[1]
-                element = project.add_new_commands(
-                    f"createLine('{p1}', '{p2}', '{name}')"
-                )
-                if element is None:
-                    return
-                self.insert_object_to_sidepanel(self.object_list.count() - 1, element)
-                self.object_list.update()
+                    element = project.add_new_commands(
+                        f"createLine('{p1}', '{p2}', '{name}')"
+                    )
+                    if element is None:
+                        return
+                    self.insert_object_to_sidepanel(element)
+                    self.object_list.update()
+        if a0.key() == Qt.Key.Key_Delete:
+            ids = {self.canvas.objects[key].id for key in self.canvas.selected_objs}
+            for row in range(self.object_list.count() - 1):
+                item = self.object_list.item(row)
+                if item is None:
+                    continue
+                item_id = item.data(Qt.ItemDataRole.UserRole)
+                if item_id in ids:
+                    project.remove_element(item_id)
+                    print(item_id)
+                    self.object_list.takeItem(row)
+                    self.canvas.update()
         if a0.key() == Qt.Key.Key_Escape:
             if self.input_field.hasFocus():
                 self.input_field.clearFocus()
@@ -111,24 +123,49 @@ class MainWindow(QMainWindow):
         self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, self.dock)
         self.object_list = QListWidget()
         self.object_list.setSelectionMode(
-            QAbstractItemView.SelectionMode.SingleSelection
+            QAbstractItemView.SelectionMode.ExtendedSelection
         )
+        self.object_list.itemSelectionChanged.connect(self.handle_list_selection)
         self.dock.setWidget(self.object_list)
-        for element in project.history:
-            self.insert_object_to_sidepanel(self.object_list.count(), element)
         container_item = QListWidgetItem(self.object_list)
         self.input_field = QLineEdit()
-        self.input_field.setPlaceholderText("Enter coordinates (e.g. 1, 2, 5)...")
+        self.input_field.setPlaceholderText("Enter command...")
         self.input_field.setStyleSheet("padding: 5px;")
         self.input_field.setMinimumHeight(36)
         self.input_field.returnPressed.connect(self.handle_new_command)
         self.object_list.addItem(container_item)
         self.object_list.setItemWidget(container_item, self.input_field)
+        for element in project.history:
+            self.insert_object_to_sidepanel(element)
 
-    def insert_object_to_sidepanel(self, index: int, element):
+    def sync_list_selection(self, selected_keys):
+        self.object_list.blockSignals(True)
+        self.object_list.clearSelection()
+        ids = {self.canvas.objects[key].id for key in self.canvas.selected_objs}
+        for row in range(self.object_list.count() - 1):
+            item = self.object_list.item(row)
+            if item is None:
+                continue
+            item_id = item.data(Qt.ItemDataRole.UserRole)
+            if item_id in ids:
+                item.setSelected(True)
+        self.object_list.blockSignals(False)
+
+    def handle_list_selection(self):
+        selected_items = self.object_list.selectedItems()
+        selected_ids = {item.data(Qt.ItemDataRole.UserRole) for item in selected_items}
+        new_canvas_selection = []
+        for key, obj in self.canvas.objects.items():
+            if hasattr(obj, "id") and obj.id in selected_ids:
+                new_canvas_selection.append(key)
+        self.canvas.selected_objs = new_canvas_selection
+        self.canvas.update()
+
+    def insert_object_to_sidepanel(self, element):
         item = QListWidgetItem()
         row_widget = ObjectPreviewWidget(element.content, self.object_list)
         item.setSizeHint(row_widget.sizeHint())
+        item.setData(Qt.ItemDataRole.UserRole, element.id)
         self.object_list.setStyleSheet("""
             QListWidget::item:selected {
                 background-color: transparent;
@@ -142,17 +179,17 @@ class MainWindow(QMainWindow):
             }
         """)
         self.object_list.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        index = self.object_list.count() - 1
         self.object_list.insertItem(index, item)
         self.object_list.setItemWidget(item, row_widget)
 
     def handle_new_command(self):
         raw_text = self.input_field.text().strip()
         self.input_field.clear()
-        if project.add_new_commands(raw_text) is None:
+        element = project.add_new_commands(raw_text)
+        if element is None:
             return
-        self.insert_object_to_sidepanel(
-            self.object_list.count() - 1, project.add_new_commands(raw_text)
-        )
+        self.insert_object_to_sidepanel(element)
         self.object_list.update()
 
     def showEvent(self, a0):
