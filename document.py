@@ -14,14 +14,14 @@ class Document:
         else:
             self.file = file_obj.read()
 
-    def update(self):
-        pass
+    def new(self):
+        self.file_path = ""
+        self.file = ""
 
     def save(self):
-        file_obj = open(self.file_path, "r+")
-        if self.file is not None:
-            file_obj.write(self.file)
-        file_obj.close()
+        with open(self.file_path, "w") as file_obj:
+            if self.file is not None:
+                file_obj.write(self.file)
 
 
 if __name__ == "__main__":

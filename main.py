@@ -6,10 +6,12 @@ from PyQt6.QtWidgets import (
     QAbstractItemView,
     QApplication,
     QDockWidget,
+    QFileDialog,
     QLineEdit,
     QListWidget,
     QListWidgetItem,
     QMainWindow,
+    QMessageBox,
     QVBoxLayout,
     QWidget,
 )
@@ -110,13 +112,60 @@ class MainWindow(QMainWindow):
         file_menu.addAction(exit_action)
 
     def file_new_triggered(self):
-        print("New File clicked!")
+        if not self.maybe_save():
+            return
+        project.new()
+        self.set_objects_panel()
+        self.canvas.update()
 
     def file_open_triggered(self):
-        print("Open File clicked!")
+        if not self.maybe_save():
+            return
+        file_path, _ = QFileDialog.getOpenFileName(
+            self, "Open Project", "", "Mongoose Files (*.mgs);;All Files (*)"
+        )
+
+        if file_path:
+            project.open(file_path)
+            self.set_objects_panel()
 
     def file_save_triggered(self):
-        print("Save File clicked!")
+        if project.document.file_path == "":
+            file_path, _ = QFileDialog.getSaveFileName(
+                self, "Save Project As", "", "Mongoose Files (*.mgs)"
+            )
+            if file_path:
+                if not file_path.endswith(".mgs"):
+                    file_path += ".mgs"
+                project.document.file_path = file_path
+                project.save()
+                return True
+            else:
+                return False
+        else:
+            project.save()
+            return True
+
+    def maybe_save(self) -> bool:
+        if not project.is_dirty:
+            return True
+
+        ret = QMessageBox.question(
+            self,
+            "Unsaved Changes",
+            "The document has been modified.\nDo you want to save your changes?",
+            QMessageBox.StandardButton.Save
+            | QMessageBox.StandardButton.Discard
+            | QMessageBox.StandardButton.Cancel,
+        )
+
+        if ret == QMessageBox.StandardButton.Save:
+            return self.file_save_triggered()
+
+        if ret == QMessageBox.StandardButton.Cancel:
+            return False
+
+        return True
 
     def init_objects_panel(self):
         self.dock = QDockWidget("Objects", self)
@@ -127,6 +176,10 @@ class MainWindow(QMainWindow):
         )
         self.object_list.itemSelectionChanged.connect(self.handle_list_selection)
         self.dock.setWidget(self.object_list)
+        self.set_objects_panel()
+
+    def set_objects_panel(self):
+        self.object_list.clear()
         container_item = QListWidgetItem(self.object_list)
         self.input_field = QLineEdit()
         self.input_field.setPlaceholderText("Enter command...")
@@ -200,7 +253,6 @@ class MainWindow(QMainWindow):
 
 
 if __name__ == "__main__":
-    project.open("tests/2_lines.mgs")
     app = QApplication(sys.argv)
     window = MainWindow()
     window.show()

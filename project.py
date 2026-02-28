@@ -22,16 +22,26 @@ class Project:
         self.history: list[Element] = []
         self.objects: dict[str, Point | Line | Circle | Plane] = {}
         self.variables = {}
-        self.next_id = 10
+        self.next_id = 0
+        self.is_dirty = False
 
     def open(self, filepath):
+        self.new()
         self.document.open(filepath)
         if self.document.file is None:
             return
-        self.history.clear()
         self.add_new_commands(self.document.file)
 
+    def new(self):
+        self.is_dirty = False
+        self.document.new()
+        self.history.clear()
+        self.objects.clear()
+        self.variables.clear()
+        self.next_id = 0
+
     def add_new_commands(self, script: str):
+        self.is_dirty = True
         try:
             tree = ast.parse(script)
         except SyntaxError as e:
@@ -81,7 +91,25 @@ class Project:
                     print(f"Unknown command: {func_name}")
         return last_element
 
+    def save(self):
+        self.is_dirty = False
+        script_lines = []
+        for el in self.history:
+            formatted_args = []
+            for arg in el.args:
+                if isinstance(arg, str):
+                    formatted_args.append(f"'{arg}'")
+                else:
+                    formatted_args.append(str(arg))
+
+            line = f"{el.cmd}({', '.join(formatted_args)})"
+            script_lines.append(line)
+
+        self.document.file = "\n".join(script_lines)
+        self.document.save()
+
     def remove_element(self, target_id: int):
+        self.is_dirty = True
         self.history = [el for el in self.history if el.id != target_id]
         keys_to_delete = []
         for key, obj in self.objects.items():
