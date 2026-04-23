@@ -22,7 +22,7 @@ class DrawingCanvas(QWidget):
     def __init__(self, objects):
         super().__init__()
         self.setMinimumSize(400, 300)
-        self.zoom = 1.0
+        self.zoom = 0.2
         self.offset = QPointF(0.0, 0.0)
 
         self.a4_w_mm = 210
@@ -78,6 +78,15 @@ class DrawingCanvas(QWidget):
         self.selection_changed.emit(self.selected_objs)
         self.update()
         a0.accept()
+    @override
+    def mouseDoubleClickEvent(self, a0):
+        if a0 is None:
+            return
+        print("Double click detected on the canvas!")
+        if a0.button() == Qt.MouseButton.LeftButton:
+            if self.hovered_obj is not None:
+                print(f"Double-clicked on object key: {self.hovered_obj}")
+        a0.accept()
 
     @override
     def mouseMoveEvent(self, a0):
@@ -99,6 +108,9 @@ class DrawingCanvas(QWidget):
         best_dist = float("inf")
         hit_threshold = self.hit_threshold * self.mm_to_px / (self.scale * self.zoom)
         for key, obj in self.objects.items():
+            # Skip invisible objects from hover detection (but never skip axes)
+            if (hasattr(obj, 'type') and obj.type == 'none' or getattr(obj, 'hidden', False)) and getattr(obj, 'name', '') not in ('org_x', 'org_y'):
+                continue
             dist = float("inf")
             if isinstance(obj, Point):
                 dist = (
@@ -168,36 +180,44 @@ class DrawingCanvas(QWidget):
             int(self.paper_h),
         )
 
-        # Draw axis
-        pen = QPen(QColor(255, 0, 0), 0.5)
-        pen.setCapStyle(Qt.PenCapStyle.RoundCap)
-        painter.setPen(pen)
-
-        painter.drawLine(
-            int(-self.paper_w / 2 + self.padding),
-            0,
-            int(self.paper_w / 2 - self.padding),
-            0,
-        )
         # Draw all objects
         self.draw_objects(painter)
 
     def draw_objects(self, painter: QPainter):
         for key, obj in self.objects.items():
+            # Skip invisible objects from rendering (but never skip axes)
+            if (hasattr(obj, 'type') and obj.type == 'none' or getattr(obj, 'hidden', False)) and getattr(obj, 'name', '') not in ('org_x', 'org_y'):
+                continue
             is_hovered = key == self.hovered_obj or key in self.selected_objs
             if isinstance(obj, Line):
-                if obj.name == "org_x" or obj.name == "org_y":
-                    continue
-                self.draw_line(painter, obj, is_hovered)
+                if obj.name in ("org_x", "org_y"):
+                    self.draw_axis(painter, obj, is_hovered)
+                else:
+                    self.draw_line(painter, obj, is_hovered)
             elif isinstance(obj, Circle):
                 self.draw_circle(painter, obj, is_hovered)
-            # elif isinstance(obj, Plane):
-            #     self.draw_plane(obj)
 
         for key, obj in self.objects.items():
+            # Skip invisible objects from rendering (but never skip axes)
+            if (hasattr(obj, 'type') and obj.type == 'none' or getattr(obj, 'hidden', False)) and getattr(obj, 'name', '') not in ('org_x', 'org_y'):
+                continue
             is_hovered = key == self.hovered_obj or key in self.selected_objs
             if isinstance(obj, Point):
                 self.draw_point(painter, obj, is_hovered)
+
+    def draw_axis(self, painter: QPainter, line: Line, is_hovered: bool):
+        base_color = QColor(200, 50, 50) if line.name == "org_x" else QColor(0, 165, 255)
+        color = QColor(255, 165, 0) if is_hovered else base_color
+        thickness = 0.5 if is_hovered else 0.3
+        pen = QPen(color, thickness * self.mm_to_px)
+        pen.setCapStyle(Qt.PenCapStyle.RoundCap)
+        painter.setPen(pen)
+        painter.drawLine(
+            int(line.p1.x * self.scale * self.mm_to_px),
+            -int(line.p1.y * self.scale * self.mm_to_px),
+            int(line.p2.x * self.scale * self.mm_to_px),
+            -int(line.p2.y * self.scale * self.mm_to_px),
+        )
 
     def draw_point(self, painter: QPainter, point: Point, is_hovered: bool):
         color = QColor(255, 165, 0) if is_hovered else QColor(0, 0, 255)

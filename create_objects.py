@@ -74,6 +74,17 @@ def setStyle(objects, obj: str, line_style: str):
     object.style = line_style
 
 
+def setVisibilities(objects, vis_dict: dict):
+    for obj_name, props in vis_dict.items():
+        if obj_name in objects:
+            obj = objects[obj_name]
+            if type(obj) is Circle or type(obj) is Line:
+                if len(props) > 0:
+                    obj.style = props[0]
+                if len(props) > 1:
+                    obj.type = props[1]
+
+
 def setCircleDrawRange(id: int, objects, circle: str, point_from: str, point_to: str):
     circle_obj = objects[circle]
     point_from_obj = objects[point_from]

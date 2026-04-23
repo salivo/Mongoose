@@ -326,6 +326,8 @@ class SVGExport:
         self.drawTemplate()
 
         for obj in objects.values():
+            if getattr(obj, "hidden", False):
+                continue
             match obj:
                 case Point():
                     self.drawPoint(obj)
