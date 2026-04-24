@@ -20,7 +20,7 @@ class Line:
         self.name: str = name
         self.type: str = "construct"
         self.style: str = "normal"
-        self.resize: tuple[float, float] = (1.0, 1.0)
+        self.resize: tuple[float, float] = (0.0, 1.0)
 
 
 class Circle:

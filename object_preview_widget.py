@@ -123,18 +123,24 @@ class ObjectPreviewWidget(QWidget):
 
 
 def get_icon(icon_name, size=24):
-    svg_path = icons[icon_name]
-    with open("static/icons/" + svg_path, "r") as f:
-        svg_data = f.read()
-    dpr = QGuiApplication.primaryScreen().devicePixelRatio()
-    pixmap = QPixmap(int(size * dpr), int(size * dpr))
-    pixmap.fill(Qt.GlobalColor.transparent)
-    pixmap.setDevicePixelRatio(dpr)
-    renderer = QSvgRenderer(svg_data.encode("utf-8"))
-    painter = QPainter(pixmap)
-    painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-    target_rect = QRectF(0, 0, size, size)
-    renderer.render(painter, target_rect)
+    try:
+        svg_path = icons[icon_name]
+        with open("static/icons/" + svg_path, "r") as f:
+            svg_data = f.read()
+        dpr = QGuiApplication.primaryScreen().devicePixelRatio()
+        pixmap = QPixmap(int(size * dpr), int(size * dpr))
+        pixmap.fill(Qt.GlobalColor.transparent)
+        pixmap.setDevicePixelRatio(dpr)
+        renderer = QSvgRenderer(svg_data.encode("utf-8"))
+        painter = QPainter(pixmap)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        target_rect = QRectF(0, 0, size, size)
+        renderer.render(painter, target_rect)
 
-    painter.end()
-    return pixmap
+        painter.end()
+        return pixmap
+    except Exception as e:
+        print(f"Warning: Could not load icon {icon_name}: {e}")
+        pixmap = QPixmap(size, size)
+        pixmap.fill(Qt.GlobalColor.transparent)
+        return pixmap

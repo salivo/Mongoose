@@ -18,6 +18,7 @@ type = {
 
 class DrawingCanvas(QWidget):
     selection_changed = pyqtSignal(list)
+    resize_confirmed = pyqtSignal(str, float, float)
 
     def __init__(self, objects):
         super().__init__()
@@ -44,6 +45,12 @@ class DrawingCanvas(QWidget):
         self.setFocusPolicy(Qt.FocusPolicy.ClickFocus)
         self.setMouseTracking(True)
 
+        # Resize mode state
+        self.resize_mode = False
+        self.resize_line_key = None
+        self.resize_preview = (0.0, 1.0)  # (r1, r2) t-parameters
+        self.resize_side = 'end'           # which endpoint is being dragged
+
     @override
     def wheelEvent(self, a0: QWheelEvent | None):
         if a0 is None:
@@ -63,6 +70,16 @@ class DrawingCanvas(QWidget):
     @override
     def mousePressEvent(self, a0):
         if a0 is None:
+            return
+        # In resize mode, left click confirms the new resize
+        if self.resize_mode and a0.button() == Qt.MouseButton.LeftButton:
+            if self.resize_line_key:
+                r1, r2 = self.resize_preview
+                self.resize_confirmed.emit(self.resize_line_key, r1, r2)
+            self.resize_mode = False
+            self.resize_line_key = None
+            self.update()
+            a0.accept()
             return
         if a0.button() == Qt.MouseButton.MiddleButton:
             self.last_mouse_pos = a0.position()
@@ -100,6 +117,27 @@ class DrawingCanvas(QWidget):
             self.update()
             a0.accept()
             return
+
+        # Resize mode: compute extension on the active side only
+        if self.resize_mode and self.resize_line_key:
+            line = self.objects.get(self.resize_line_key)
+            if isinstance(line, Line):
+                logical = self.map_to_logical(a0.position())
+                mx, my = logical.x(), logical.y()
+                dx = line.p2.x - line.p1.x
+                dy = line.p2.y - line.p1.y
+                l2 = dx * dx + dy * dy
+                if l2 > 0:
+                    t = ((mx - line.p1.x) * dx + (my - line.p1.y) * dy) / l2
+                    r1, r2 = self.resize_preview
+                    if self.resize_side == 'end':
+                        r2 = round(t, 4)
+                    else:
+                        r1 = round(t, 4)
+                    self.resize_preview = (r1, r2)
+                self.update()
+            return
+
         logical_pos = self.map_to_logical(a0.position())
         self.check_mouse_hover(logical_pos.x(), logical_pos.y())
 
@@ -205,6 +243,34 @@ class DrawingCanvas(QWidget):
             if isinstance(obj, Point):
                 self.draw_point(painter, obj, is_hovered)
 
+        # Draw resize mode preview overlay
+        if self.resize_mode and self.resize_line_key:
+            line = self.objects.get(self.resize_line_key)
+            if isinstance(line, Line):
+                r1, r2 = self.resize_preview
+                dx = line.p2.x - line.p1.x
+                dy = line.p2.y - line.p1.y
+                sc = self.scale * self.mm_to_px
+                sx = int((line.p1.x + r1 * dx) * sc)
+                sy = -int((line.p1.y + r1 * dy) * sc)
+                ex = int((line.p1.x + r2 * dx) * sc)
+                ey = -int((line.p1.y + r2 * dy) * sc)
+
+                # Draw blue preview line
+                preview_pen = QPen(QColor(30, 120, 255, 200),
+                                   (style.get(line.style, 0.2) + 0.2) * self.mm_to_px)
+                preview_pen.setStyle(Qt.PenStyle.DashLine)
+                preview_pen.setCapStyle(Qt.PenCapStyle.RoundCap)
+                painter.setPen(preview_pen)
+                painter.drawLine(sx, sy, ex, ey)
+
+                # Draw small dots at the ORIGINAL p1 and p2 positions for reference
+                orig_pen = QPen(QColor(30, 120, 255, 160), 0.6 * self.mm_to_px)
+                orig_pen.setCapStyle(Qt.PenCapStyle.RoundCap)
+                painter.setPen(orig_pen)
+                painter.drawPoint(int(line.p1.x * sc), -int(line.p1.y * sc))
+                painter.drawPoint(int(line.p2.x * sc), -int(line.p2.y * sc))
+
     def draw_axis(self, painter: QPainter, line: Line, is_hovered: bool):
         base_color = QColor(200, 50, 50) if line.name == "org_x" else QColor(0, 165, 255)
         color = QColor(255, 165, 0) if is_hovered else base_color
@@ -239,11 +305,16 @@ class DrawingCanvas(QWidget):
         pen.setStyle(type[line.type])
         pen.setCapStyle(Qt.PenCapStyle.RoundCap)
         painter.setPen(pen)
+        # Apply visual resize (t-parameters along p1→p2)
+        r1, r2 = getattr(line, 'resize', (0.0, 1.0))
+        dx = line.p2.x - line.p1.x
+        dy = line.p2.y - line.p1.y
+        sc = self.scale * self.mm_to_px
         painter.drawLine(
-            int(line.p1.x * self.scale * self.mm_to_px),
-            -int(line.p1.y * self.scale * self.mm_to_px),
-            int(line.p2.x * self.scale * self.mm_to_px),
-            -int(line.p2.y * self.scale * self.mm_to_px),
+            int((line.p1.x + r1 * dx) * sc),
+            -int((line.p1.y + r1 * dy) * sc),
+            int((line.p1.x + r2 * dx) * sc),
+            -int((line.p1.y + r2 * dy) * sc),
         )
 
     def draw_circle(self, painter: QPainter, circle: Circle, is_hovered: bool):

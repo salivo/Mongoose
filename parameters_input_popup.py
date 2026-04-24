@@ -14,12 +14,41 @@ from PyQt6.QtWidgets import (
 )
 
 
-class NullableSpinBox(QDoubleSpinBox):
-    _NULL_STYLE = "QDoubleSpinBox { color: gray; font-style: italic; }"
+class NumericOrVarInput(QLineEdit):
+    """A text field that accepts either a numeric literal (e.g. '2.5') or
+    a variable name (e.g. 'd'). Returns float if numeric, str otherwise."""
+
+    def __init__(self, default_value=1.0, placeholder="number or variable", parent=None):
+        super().__init__(parent)
+        self.setText(str(default_value))
+        self.setPlaceholderText(placeholder)
+        self.setToolTip("Enter a number (e.g. 2.5) or a variable name (e.g. d)")
+
+    def get_value(self):
+        """Return float if parseable as number, else return raw string (variable name)."""
+        text = self.text().strip()
+        try:
+            return float(text)
+        except ValueError:
+            return text  # treat as variable name
+
+    def repr_for_cmd(self):
+        """Return a string suitable for embedding in a command:
+        quoted if it looks like an object/variable reference, numeric otherwise."""
+        val = self.get_value()
+        if isinstance(val, float):
+            return repr(val)
+        # It's a variable name — emit it unquoted so the engine resolves it
+        return val
+
+
+class NullableSpinBox(NumericOrVarInput):
+    _NULL_STYLE = "QLineEdit { color: gray; font-style: italic; }"
 
     def __init__(self, parent=None):
-        super().__init__(parent)
+        super().__init__(default_value=1.0, placeholder="number, var, or ?", parent=parent)
         self._is_null = False
+        self._last_val = "1.0"
 
     def is_null(self) -> bool:
         return self._is_null
@@ -27,12 +56,13 @@ class NullableSpinBox(QDoubleSpinBox):
     def set_null(self, null: bool):
         self._is_null = null
         if null:
+            self._last_val = self.text()
             self.setReadOnly(True)
-            self.lineEdit().setText("None")
+            self.setText("None")
             self.setStyleSheet(self._NULL_STYLE)
         else:
             self.setReadOnly(False)
-            self.lineEdit().setText(self.textFromValue(self.value()))
+            self.setText(self._last_val)
             self.setStyleSheet("")
 
     def keyPressEvent(self, event):
@@ -40,6 +70,16 @@ class NullableSpinBox(QDoubleSpinBox):
             self.set_null(not self._is_null)
             return
         super().keyPressEvent(event)
+
+    def get_value(self):
+        if self._is_null:
+            return None
+        return super().get_value()
+
+    def repr_for_cmd(self):
+        if self._is_null:
+            return "None"
+        return super().repr_for_cmd()
 
 
 class PointSetParamsPopup(QDialog):
@@ -51,25 +91,16 @@ class PointSetParamsPopup(QDialog):
 
         layout = QVBoxLayout()
 
-        layout.addWidget(QLabel("X"))
-        self.x_input = QDoubleSpinBox()
-        self.x_input.setRange(float("-inf"), float("inf"))
-        self.x_input.setDecimals(2)
-        self.x_input.setValue(1.0)
+        layout.addWidget(QLabel("X (number or variable):"))
+        self.x_input = NumericOrVarInput(default_value=1.0)
         layout.addWidget(self.x_input)
 
-        layout.addWidget(QLabel("Y"))
+        layout.addWidget(QLabel("Y (? for None):"))
         self.y_input = NullableSpinBox()
-        self.y_input.setRange(float("-inf"), float("inf"))
-        self.y_input.setDecimals(2)
-        self.y_input.setValue(1.0)
         layout.addWidget(self.y_input)
 
-        layout.addWidget(QLabel("Z"))
+        layout.addWidget(QLabel("Z (? for None):"))
         self.z_input = NullableSpinBox()
-        self.z_input.setRange(float("-inf"), float("inf"))
-        self.z_input.setDecimals(2)
-        self.z_input.setValue(1.0)
         layout.addWidget(self.z_input)
 
         layout.addWidget(QLabel("Point Name:"))
@@ -94,10 +125,10 @@ class PointSetParamsPopup(QDialog):
         self.setLayout(layout)
 
     def get_y(self):
-        return None if self.y_input.is_null() else self.y_input.value()
+        return self.y_input.get_value()
 
     def get_z(self):
-        return None if self.z_input.is_null() else self.z_input.value()
+        return self.z_input.get_value()
 
     def validate_input(self, text):
         if text.strip():
@@ -177,11 +208,8 @@ class CreateCirclePopup(QDialog):
         self.setModal(True)
         self.setWindowFlags(Qt.WindowType.Tool | Qt.WindowType.WindowStaysOnTopHint)
         layout = QVBoxLayout()
-        layout.addWidget(QLabel("Radius:"))
-        self.radius_input = QDoubleSpinBox()
-        self.radius_input.setRange(0.0001, float("inf"))
-        self.radius_input.setDecimals(4)
-        self.radius_input.setValue(1.0)
+        layout.addWidget(QLabel("Radius (number or variable):"))
+        self.radius_input = NumericOrVarInput(default_value=1.0, placeholder="e.g. 2.5 or r")
         layout.addWidget(self.radius_input)
         layout.addWidget(QLabel("Circle Name:"))
         self.name_input = QLineEdit()
@@ -196,6 +224,7 @@ class CreateCirclePopup(QDialog):
         self.ok_button.setEnabled(False)
         layout.addWidget(self.button_box)
         self.radius_input.setFocus()
+        self.radius_input.selectAll()
         layout.setSizeConstraint(QVBoxLayout.SizeConstraint.SetFixedSize)
         self.setLayout(layout)
 
@@ -212,11 +241,8 @@ class CreatePlanePopup(QDialog):
         self.setModal(True)
         self.setWindowFlags(Qt.WindowType.Tool | Qt.WindowType.WindowStaysOnTopHint)
         layout = QVBoxLayout()
-        layout.addWidget(QLabel("X coordinate:"))
-        self.x_input = QDoubleSpinBox()
-        self.x_input.setRange(float("-inf"), float("inf"))
-        self.x_input.setDecimals(2)
-        self.x_input.setValue(0.0)
+        layout.addWidget(QLabel("X coordinate (number or variable):"))
+        self.x_input = NumericOrVarInput(default_value=0.0)
         layout.addWidget(self.x_input)
         layout.addWidget(QLabel("Y1 (value or label):"))
         self.y1_input = QLineEdit()
@@ -247,7 +273,7 @@ class CreatePlanePopup(QDialog):
 
     def get_coords(self):
         """Return (x, y1, y2) with y values as float if possible, else str."""
-        x = self.x_input.value()
+        x = self.x_input.get_value()
         y1_text = self.y1_input.text().strip()
         y2_text = self.y2_input.text().strip()
         try:
@@ -270,11 +296,8 @@ class PerpFromPointPopup(QDialog):
         self.setModal(True)
         self.setWindowFlags(Qt.WindowType.Tool | Qt.WindowType.WindowStaysOnTopHint)
         layout = QVBoxLayout()
-        layout.addWidget(QLabel("Distance:"))
-        self.distance_input = QDoubleSpinBox()
-        self.distance_input.setRange(float("-inf"), float("inf"))
-        self.distance_input.setDecimals(4)
-        self.distance_input.setValue(1.0)
+        layout.addWidget(QLabel("Distance (number or variable):"))
+        self.distance_input = NumericOrVarInput(default_value=1.0, placeholder="e.g. 1.5 or d")
         layout.addWidget(self.distance_input)
         layout.addWidget(QLabel("Point Name:"))
         self.name_input = QLineEdit()
@@ -289,6 +312,7 @@ class PerpFromPointPopup(QDialog):
         self.ok_button.setEnabled(False)
         layout.addWidget(self.button_box)
         self.distance_input.setFocus()
+        self.distance_input.selectAll()
         layout.setSizeConstraint(QVBoxLayout.SizeConstraint.SetFixedSize)
         self.setLayout(layout)
 

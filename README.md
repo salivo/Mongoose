@@ -78,6 +78,7 @@ python main.py tests/4_perpendicular.mgs
 | **R** | **Perp. Point** | 1 Point + 1 Line (Creates perp. at distance) |
 | **F** | **Foot of Perp.** | 1 Point + 1 Line (Creates projection) |
 | **D** | **Circle Range** | 1 Circle + 2 Points (Sets start/end angles) |
+| **E** | **Extend Line** | 1 Line (Move mouse to set visual length, click to confirm) |
 
 ### Editing & History
 | Shortcut | Action | Selection Required |

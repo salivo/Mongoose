@@ -57,6 +57,7 @@ class MainWindow(QMainWindow):
         self.canvas = DrawingCanvas(project.objects)
         layout.addWidget(self.canvas)
         self.canvas.selection_changed.connect(self.sync_list_selection)
+        self.canvas.resize_confirmed.connect(self.handle_resize_confirmed)
         self.input_field.clearFocus()
 
     def closeEvent(self, a0):
@@ -90,13 +91,11 @@ class MainWindow(QMainWindow):
             if popup.exec():
                 project.push_state()
                 name = popup.name_input.text()
-                x_value = popup.x_input.value()
-                y_value = popup.get_y()
-                z_value = popup.get_z()
-                y_repr = "None" if y_value is None else str(y_value)
-                z_repr = "None" if z_value is None else str(z_value)
+                x_repr = popup.x_input.repr_for_cmd()
+                y_repr = popup.y_input.repr_for_cmd()
+                z_repr = popup.z_input.repr_for_cmd()
                 element = project.add_new_commands(
-                    f"createPoint(({x_value}, {y_repr}, {z_repr}), {repr(name)})"
+                    f"createPoint(({x_repr}, {y_repr}, {z_repr}), {repr(name)})"
                 )
                 if element is None:
                     return
@@ -133,9 +132,9 @@ class MainWindow(QMainWindow):
                 if popup.exec():
                     project.push_state()
                     name = popup.name_input.text()
-                    distance = popup.distance_input.value()
+                    distance_repr = popup.distance_input.repr_for_cmd()
                     element = project.add_new_commands(
-                        f"createPerpFromPoint({repr(points[0])}, {repr(lines[0])}, {distance}, {repr(name)})"
+                        f"createPerpFromPoint({repr(points[0])}, {repr(lines[0])}, {distance_repr}, {repr(name)})"
                     )
                     if element is not None:
                         self.insert_object_to_sidepanel(element)
@@ -150,9 +149,9 @@ class MainWindow(QMainWindow):
                 if popup.exec():
                     project.push_state()
                     name = popup.name_input.text()
-                    radius = popup.radius_input.value()
+                    radius_repr = popup.radius_input.repr_for_cmd()
                     element = project.add_new_commands(
-                        f"createCircle({repr(points[0])}, {radius}, {repr(name)})"
+                        f"createCircle({repr(points[0])}, {radius_repr}, {repr(name)})"
                     )
                     if element is not None:
                         self.insert_object_to_sidepanel(element)
@@ -166,10 +165,11 @@ class MainWindow(QMainWindow):
                 name = popup.name_input.text()
                 coords = popup.get_coords()
                 x, y1, y2 = coords
+                x_repr = popup.x_input.repr_for_cmd()
                 y1_repr = repr(y1) if isinstance(y1, str) else str(y1)
                 y2_repr = repr(y2) if isinstance(y2, str) else str(y2)
                 element = project.add_new_commands(
-                    f"createPlane(({x}, {y1_repr}, {y2_repr}), {repr(name)})"
+                    f"createPlane(({x_repr}, {y1_repr}, {y2_repr}), {repr(name)})"
                 )
                 if element is not None:
                     self.insert_object_to_sidepanel(element)
@@ -233,7 +233,15 @@ class MainWindow(QMainWindow):
                     project.push_state()
                     name = popup.name_input.text()
                     offset = popup.get_offset()
-                    offset_repr = repr(offset) if isinstance(offset, str) else str(offset)
+                    if isinstance(offset, str):
+                        # If the string names an existing object, assume it's a line reference and quote it.
+                        # Otherwise assume it's a variable name and output it unquoted.
+                        if offset in project.objects:
+                            offset_repr = repr(offset)
+                        else:
+                            offset_repr = offset
+                    else:
+                        offset_repr = str(offset)
                     element = project.add_new_commands(
                         f"parallel({repr(points[0])}, {repr(lines[0])}, {offset_repr}, {repr(name)})"
                     )
@@ -241,6 +249,34 @@ class MainWindow(QMainWindow):
                         self.insert_object_to_sidepanel(element)
                         self.object_list.update()
                         self.canvas.update()
+        # --- resize line: E key (select exactly 1 Line) ---
+        if a0.key() == Qt.Key.Key_E:
+            sel = self.canvas.selected_objs
+            lines = [k for k in sel if isinstance(project.objects.get(k), Line)]
+            if len(lines) == 1:
+                line_key = lines[0]
+                line_obj = project.objects[line_key]
+
+                # Determine which endpoint the mouse is closer to at press time
+                from PyQt6.QtGui import QCursor
+                from PyQt6.QtCore import QPointF as _QPointF
+                mouse_widget = self.canvas.mapFromGlobal(QCursor.pos())
+                logical = self.canvas.map_to_logical(_QPointF(mouse_widget.x(), mouse_widget.y()))
+                mx, my = logical.x(), logical.y()
+                dx = line_obj.p2.x - line_obj.p1.x
+                dy = line_obj.p2.y - line_obj.p1.y
+                l2 = dx * dx + dy * dy
+                side = 'end'  # default
+                if l2 > 0:
+                    t = ((mx - line_obj.p1.x) * dx + (my - line_obj.p1.y) * dy) / l2
+                    side = 'end' if t >= 0.5 else 'start'
+
+                self.canvas.resize_mode = True
+                self.canvas.resize_line_key = line_key
+                self.canvas.resize_side = side
+                self.canvas.resize_preview = getattr(line_obj, 'resize', (0.0, 1.0))
+                self.canvas.update()
+            return
         # --- visibility: V key (select Lines/Circles to set type/style) ---
         if a0.key() == Qt.Key.Key_V:
             sel = self.canvas.selected_objs
@@ -359,6 +395,11 @@ class MainWindow(QMainWindow):
                     self.canvas.selected_objs.clear()
                     self.canvas.update()
         if a0.key() == Qt.Key.Key_Escape:
+            # Cancel resize mode if active
+            if self.canvas.resize_mode:
+                self.canvas.resize_mode = False
+                self.canvas.resize_line_key = None
+                self.canvas.update()
             if self.input_field.hasFocus():
                 self.input_field.clearFocus()
             self.canvas.selected_objs.clear()
@@ -435,6 +476,12 @@ class MainWindow(QMainWindow):
         else:
             project.save()
             return True
+
+    def handle_resize_confirmed(self, line_key: str, r1: float, r2: float):
+        """Called when the user clicks in resize mode to confirm a new line extent."""
+        project.push_state()
+        project.add_new_commands(f"setResize({repr(line_key)}, {r1}, {r2})")
+        self.canvas.update()
 
     def file_export_triggered(self):
         global app_cfg

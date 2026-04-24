@@ -74,6 +74,15 @@ def setStyle(objects, obj: str, line_style: str):
     object.style = line_style
 
 
+def setResize(objects, name: str, r1: float, r2: float):
+    """Set the visual draw range of a Line as t-parameters along p1→p2.
+    r1=0.0, r2=1.0 = default (exactly p1 to p2).
+    Values outside [0,1] extend the line past its endpoints visually."""
+    obj = objects.get(name)
+    if isinstance(obj, Line):
+        obj.resize = (float(r1), float(r2))
+
+
 def setVisibilities(objects, vis_dict: dict):
     for obj_name, props in vis_dict.items():
         if obj_name in objects:

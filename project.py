@@ -133,6 +133,7 @@ class Project:
             ),
             "setType": create_objects.setType,
             "setStyle": create_objects.setStyle,
+            "setResize": create_objects.setResize,
             "setVisibilities": create_objects.setVisibilities,
             "hideInUI": lambda objects, name: None,
             "hideObject": lambda objects, name: setattr(objects[name], "hidden", True) if name in objects else None,
@@ -182,7 +183,7 @@ class Project:
                             func(self.objects, *args)
                         
                         # Only hide utility commands from the UI
-                        if func_name in ("setType", "setStyle", "setVisibilities", "hideInUI"):
+                        if func_name in ("setType", "setStyle", "setVisibilities", "hideInUI", "setResize"):
                             show_in_ui = False
                     elif hasattr(create_objects, func_name):
                         func = getattr(create_objects, func_name)
