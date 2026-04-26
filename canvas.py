@@ -42,6 +42,7 @@ class DrawingCanvas(QWidget):
         self.objects = objects
         self.hovered_obj = None
         self.selected_objs = []
+        self.last_mouse_widget_pos = None
         self.setFocusPolicy(Qt.FocusPolicy.ClickFocus)
         self.setMouseTracking(True)
 
@@ -57,9 +58,18 @@ class DrawingCanvas(QWidget):
             return
 
         mouse_pos = a0.position()
-        factor = (
-            self.zoom_in_factor if a0.angleDelta().y() > 0 else 1 / self.zoom_in_factor
-        )
+        delta = a0.angleDelta().y()
+        if delta == 0:
+            return
+
+        # On Linux, touchpads usually emit pixelDelta() whereas normal mice do not.
+        # We invert the delta if pixelDelta is present (indicating a touchpad).
+        if not a0.pixelDelta().isNull():
+            delta = -delta
+
+        # A standard mouse wheel step is 120. For touchpads, the delta is smaller but more frequent.
+        # Scale the zoom factor proportionally to the delta for smooth zooming on all devices.
+        factor = (self.zoom_in_factor) ** (delta / 120.0)
         center = QPointF(self.width() / 2, self.height() / 2)
         relative_pos = mouse_pos - (center + self.offset)
         self.offset -= relative_pos * (factor - 1)
@@ -109,6 +119,7 @@ class DrawingCanvas(QWidget):
     def mouseMoveEvent(self, a0):
         if a0 is None:
             return
+        self.last_mouse_widget_pos = a0.position()
         if a0.buttons() & Qt.MouseButton.MiddleButton:
             current_pos = a0.position()
             delta = current_pos - self.last_mouse_pos
@@ -291,12 +302,23 @@ class DrawingCanvas(QWidget):
         pen = QPen(color, thickness * self.mm_to_px)
         pen.setCapStyle(Qt.PenCapStyle.RoundCap)
         painter.setPen(pen)
-        painter.drawPoint(
-            QPointF(
-                point.x * self.scale * self.mm_to_px,
-                -point.y * self.scale * self.mm_to_px,
-            )
+        pt = QPointF(
+            point.x * self.scale * self.mm_to_px,
+            -point.y * self.scale * self.mm_to_px,
         )
+        painter.drawPoint(pt)
+
+        # Draw point name
+        mapped = painter.transform().map(pt)
+        painter.save()
+        painter.resetTransform()
+        text_pen = QPen(color)
+        painter.setPen(text_pen)
+        font = painter.font()
+        font.setPointSize(10)
+        painter.setFont(font)
+        painter.drawText(mapped + QPointF(6, -6), point.name)
+        painter.restore()
 
     def draw_line(self, painter: QPainter, line: Line, is_hovered: bool):
         color = QColor(255, 165, 0) if is_hovered else QColor(0, 0, 0)
@@ -316,6 +338,17 @@ class DrawingCanvas(QWidget):
             int((line.p1.x + r2 * dx) * sc),
             -int((line.p1.y + r2 * dy) * sc),
         )
+
+        if is_hovered and self.last_mouse_widget_pos and line.name not in ("org_x", "org_y"):
+            painter.save()
+            painter.resetTransform()
+            text_pen = QPen(QColor(255, 165, 0))
+            painter.setPen(text_pen)
+            font = painter.font()
+            font.setPointSize(10)
+            painter.setFont(font)
+            painter.drawText(self.last_mouse_widget_pos + QPointF(10, -10), line.name)
+            painter.restore()
 
     def draw_circle(self, painter: QPainter, circle: Circle, is_hovered: bool):
         color = QColor(255, 165, 0) if is_hovered else QColor(0, 0, 0)
@@ -338,6 +371,17 @@ class DrawingCanvas(QWidget):
             int(draw_from),
             int(span),
         )
+
+        if is_hovered and self.last_mouse_widget_pos:
+            painter.save()
+            painter.resetTransform()
+            text_pen = QPen(QColor(255, 165, 0))
+            painter.setPen(text_pen)
+            font = painter.font()
+            font.setPointSize(10)
+            painter.setFont(font)
+            painter.drawText(self.last_mouse_widget_pos + QPointF(10, -10), circle.name)
+            painter.restore()
 
     def map_to_logical(self, pos: QPointF) -> QPointF:
         center_x = self.width() / 2 + self.offset.x()

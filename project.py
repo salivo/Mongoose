@@ -37,6 +37,7 @@ class Project:
         self.next_id = 2
         self.is_dirty = False
         self.project_name = ""
+        self.work_number = ""
         self.objects["org_x"] = create_objects.org_x
         self.objects["org_y"] = create_objects.org_y
 
@@ -45,14 +46,17 @@ class Project:
         self.document.open(filepath)
         if self.document.file is None:
             return
-        # Parse project_name from magic comment at top of file
+        # Parse project_name and work_number from magic comments at top of file
         self.project_name = ""
+        self.work_number = ""
         lines = self.document.file.split("\n")
         script_lines = []
         for line in lines:
             stripped = line.strip()
             if stripped.startswith("# project_name:"):
                 self.project_name = stripped[len("# project_name:"):].strip()
+            elif stripped.startswith("# work_number:"):
+                self.work_number = stripped[len("# work_number:"):].strip()
             else:
                 script_lines.append(line)
         self.add_new_commands("\n".join(script_lines))
@@ -63,6 +67,7 @@ class Project:
     def new(self):
         self.is_dirty = False
         self.project_name = ""
+        self.work_number = ""
         self.document.new()
         self.history.clear()
         self.undo_stack.clear()
@@ -280,7 +285,9 @@ class Project:
             script_lines.insert(0, f"visibilities = {vis_str}")
             script_lines.append("setVisibilities(visibilities)")
 
-        # Prepend project name as a magic comment
+        # Prepend project name and work number as magic comments
+        if self.work_number:
+            script_lines.insert(0, f"# work_number: {self.work_number}")
         if self.project_name:
             script_lines.insert(0, f"# project_name: {self.project_name}")
 
@@ -323,6 +330,14 @@ def gen_content_from_args(id, cmd, args):
                 ObjectTypes.CIRCLE,
                 "normal",
                 f"c={args[0]}, r={args[1]}",
+                id,
+            )
+        case "createSplitSegment":
+            return ObjectPreviewType(
+                f"{args[3]} ({args[1]}, {args[2]})",
+                ObjectTypes.LINE,
+                "normal",
+                args[0],
                 id,
             )
         case "createPlane":

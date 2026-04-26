@@ -232,10 +232,13 @@ class SVGExport:
             return
         width, style = self.convertStyle(line)
 
-        x1 = line.p1.x - (line.p2.x - line.p1.x) * (line.resize[0] - 1)
-        x2 = line.p2.x + (line.p2.x - line.p1.x) * (line.resize[1] - 1)
-        y1 = line.p1.y - (line.p2.y - line.p1.y) * (line.resize[0] - 1)
-        y2 = line.p2.y + (line.p2.y - line.p1.y) * (line.resize[1] - 1)
+        r1, r2 = line.resize
+        dx = line.p2.x - line.p1.x
+        dy = line.p2.y - line.p1.y
+        x1 = line.p1.x + r1 * dx
+        y1 = line.p1.y + r1 * dy
+        x2 = line.p1.x + r2 * dx
+        y2 = line.p1.y + r2 * dy
 
         svg_x1 = self.transform_x(x1)
         svg_y1 = self.transform_y(y1)

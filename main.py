@@ -333,26 +333,24 @@ class MainWindow(QMainWindow):
                     valid_split_pts.append((dist, pt_name))
                 
                 # 2. Gather intersections from all "knife" lines
-                for idx, knife_name in enumerate(lines[1:]):
+                for knife_name in lines[1:]:
                     knife_obj = project.objects[knife_name]
                     pt = intersect_line2line(0, line_obj, knife_obj, "temp")
                     if pt is not None:
-                        pt_name = f"{line_name}_x{idx+1}_{knife_name}"
                         dist = measure_point2point_distance(line_obj.p1, pt)
-                        valid_split_pts.append((dist, pt_name))
-                        cmd_str.append(f"intersect({repr(line_name)}, {repr(knife_name)}, {repr(pt_name)}, 1)")
+                        valid_split_pts.append((dist, knife_name))
                 
                 if valid_split_pts:
                     # Sort all cutting points (manual + line intersections) by distance from start
                     valid_split_pts.sort(key=lambda x: x[0])
                     
-                    segment_points = [line_obj.p1.name] + [v[1] for v in valid_split_pts] + [line_obj.p2.name]
+                    segment_bounds = [line_obj.p1.name] + [v[1] for v in valid_split_pts] + [line_obj.p2.name]
                     
-                    for i in range(len(segment_points) - 1):
-                        start_pt = segment_points[i]
-                        end_pt = segment_points[i+1]
+                    for i in range(len(segment_bounds) - 1):
+                        bound1 = segment_bounds[i]
+                        bound2 = segment_bounds[i+1]
                         new_name = f"{line_name}_{i+1}"
-                        cmd_str.append(f"createLine({repr(start_pt)}, {repr(end_pt)}, {repr(new_name)})")
+                        cmd_str.append(f"createSplitSegment({repr(line_name)}, {repr(bound1)}, {repr(bound2)}, {repr(new_name)})")
                         
                         if hasattr(line_obj, 'type') and line_obj.type != 'construct':
                             cmd_str.append(f"setType({repr(new_name)}, {repr(line_obj.type)})")
@@ -452,8 +450,9 @@ class MainWindow(QMainWindow):
     def file_open_triggered(self):
         if not self.maybe_save():
             return
+        default_dir = os.path.dirname(project.document.file_path) if project.document.file_path else ""
         file_path, _ = QFileDialog.getOpenFileName(
-            self, "Open Project", "", "Mongoose Files (*.mgs);;All Files (*)"
+            self, "Open Project", default_dir, "Mongoose Files (*.mgs);;All Files (*)"
         )
 
         if file_path:
@@ -494,7 +493,7 @@ class MainWindow(QMainWindow):
         name_input.setPlaceholderText("Project name (shown on page)")
         form.addRow("Project name:", name_input)
 
-        number_input = QLineEdit()
+        number_input = QLineEdit(project.work_number)
         number_input.setPlaceholderText("Work number / ID")
         form.addRow("Work number:", number_input)
 
@@ -509,16 +508,21 @@ class MainWindow(QMainWindow):
             return
 
         project.project_name = name_input.text().strip()
-        work_number = number_input.text().strip()
+        project.work_number = number_input.text().strip()
+        work_number = project.work_number
 
         # Ask where to save
-        default_name = "output.svg"
+        default_dir = ""
+        default_filename = "output.svg"
         if project.document.file_path:
-            default_name = os.path.splitext(
+            default_dir = os.path.dirname(project.document.file_path)
+            default_filename = os.path.splitext(
                 os.path.basename(project.document.file_path)
             )[0] + ".svg"
+        
+        default_full_path = os.path.join(default_dir, default_filename) if default_dir else default_filename
         file_path, _ = QFileDialog.getSaveFileName(
-            self, "Export SVG", default_name, "SVG Files (*.svg)"
+            self, "Export SVG", default_full_path, "SVG Files (*.svg)"
         )
         if not file_path:
             return

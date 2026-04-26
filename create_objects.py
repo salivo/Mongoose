@@ -45,6 +45,27 @@ def createLine(id, objects, p1_name: str, p2_name: str, name: str):
         line = Line(id, p1, p2, name)
         objects[name] = line
 
+def createSplitSegment(id, objects, line_name: str, bound1: str, bound2: str, name: str):
+    line_obj = objects.get(line_name)
+    if not isinstance(line_obj, Line): return
+
+    def get_point(bound):
+        if bound == line_obj.p1.name: return line_obj.p1
+        if bound == line_obj.p2.name: return line_obj.p2
+        obj = objects.get(bound)
+        if isinstance(obj, Point): return obj
+        if isinstance(obj, Line):
+            return intersect_line2line(id, line_obj, obj, f"{name}_{bound}")
+        return None
+
+    p1 = get_point(bound1)
+    p2 = get_point(bound2)
+    if p1 and p2:
+        # Hide anonymous intersection points from rendering
+        if p1 not in objects.values(): p1.type = 'none'
+        if p2 not in objects.values(): p2.type = 'none'
+        objects[name] = Line(id, p1, p2, name)
+
 
 def createCircle(id, objects, p_name: str, radius: float, name: str):
     p = objects[p_name]
