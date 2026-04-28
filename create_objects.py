@@ -2,6 +2,7 @@ from math import degrees
 
 from geometry_math import (
     Circle,
+    Ellipse,
     Line,
     Plane,
     Point,
@@ -74,6 +75,20 @@ def createCircle(id, objects, p_name: str, radius: float, name: str):
         objects[name] = circle
 
 
+def createEllipse(id, objects, center_name: str, p1_name: str, p2_name: str, name: str):
+    import math
+    c = objects.get(center_name)
+    p1 = objects.get(p1_name)
+    p2 = objects.get(p2_name)
+    if isinstance(c, Point) and isinstance(p1, Point) and isinstance(p2, Point):
+        # Calculate b length from p2 (distance from center)
+        dx = p2.x - c.x
+        dy = p2.y - c.y
+        b = math.sqrt(dx**2 + dy**2)
+        ellipse = Ellipse(id, c, p1, b, name)
+        objects[name] = ellipse
+
+
 def createPlane(id, objects, cords: tuple[float, float | str, float | str], name: str):
     plane = Plane(id, cords, name)
     objects[name] = plane
@@ -144,18 +159,48 @@ def footToLine(id, objects, point: str, line: str, name: str):
 
 
 def createPerpFromPoint(
-    id, objects, point: str, line: str, distance: float, name: str
+    id, objects, point: str, line: str, distance, name: str
 ) -> Point | None:
     point_obj = objects[point]
     line_obj = objects[line]
     if type(point_obj) is not Point or type(line_obj) is not Line:
         print("Invalid Line or Point")
         return
-    p = perpendicular_point_from_distance(id, point_obj, line_obj, distance, name)
-    if p is None:
-        print("Cannot create perpendicular point")
-        return
-    objects[name] = p
+
+    # If distance is a string, treat it as a line name: find where the
+    # perpendicular from point_obj through line_obj intersects that line.
+    if isinstance(distance, str):
+        target = objects.get(distance)
+        if not isinstance(target, (Line, Circle)):
+            print(f"'{distance}' is not a valid Line or Circle for perpendicular intersection")
+            return
+        # Build a perpendicular line through point_obj
+        from math import sqrt
+        vx = line_obj.p2.x - line_obj.p1.x
+        vy = line_obj.p2.y - line_obj.p1.y
+        perp_x = -vy
+        perp_y = vx
+        norm = sqrt(perp_x**2 + perp_y**2)
+        if norm == 0:
+            return
+        big = 1000
+        pp1 = Point(id, (-(point_obj.x + big * perp_x / norm), point_obj.y + big * perp_y / norm), f"_perp_{name}_1")
+        pp2 = Point(id, (-(point_obj.x - big * perp_x / norm), point_obj.y - big * perp_y / norm), f"_perp_{name}_2")
+        perp_line = Line(id, pp1, pp2, f"_perp_{name}")
+        if isinstance(target, Line):
+            p = intersect_line2line(id, perp_line, target, name)
+        else:
+            p = intersect_circle2line(id, target, perp_line, name, 1)
+        if p is None:
+            print("Perpendicular does not intersect target")
+            return
+        objects[name] = p
+    else:
+        p = perpendicular_point_from_distance(id, point_obj, line_obj, distance, name)
+        if p is None:
+            print("Cannot create perpendicular point")
+            return
+        objects[name] = p
 
 
 def intersect(id, objects, obj1: str, obj2: str, name: str, n: int = 1):

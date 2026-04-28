@@ -269,14 +269,14 @@ class SVGExport:
         cy = self.transform_y(circle.center.y)
         r = self.transform_length(circle.radius)
 
-        if circle.draw_from is None or circle.draw_to is None:
+        if circle.draw_from is None or circle.draw_span is None:
             self.svg_elements.append(
                 f'<circle cx="{cx:.2f}" cy="{cy:.2f}" r="{r:.2f}" '
                 f'fill="none" stroke="black" stroke-width="{width}" {dash_attr}/>'
             )
         else:
             start_angle = math.radians(circle.draw_from)
-            end_angle = math.radians(circle.draw_to)
+            end_angle = start_angle + math.radians(circle.draw_span)
 
             start_x = cx + r * math.cos(start_angle)
             start_y = cy - r * math.sin(start_angle)
@@ -293,6 +293,27 @@ class SVGExport:
                 f'A {r:.2f} {r:.2f} 0 {large_arc} 0 {end_x:.2f} {end_y:.2f}" '
                 f'fill="none" stroke="black" stroke-width="{width}" {dash_attr}/>'
             )
+
+    def drawEllipse(self, ellipse: Ellipse):
+        if ellipse.type == "none":
+            return
+        width, style = self.convertStyle(ellipse)
+        dasharray = self.get_dasharray(style)
+        dash_attr = f'stroke-dasharray="{dasharray}"' if dasharray else ""
+
+        cx = self.transform_x(ellipse.center.x)
+        cy = self.transform_y(ellipse.center.y)
+        rx = self.transform_length(ellipse.a)
+        ry = self.transform_length(ellipse.b)
+
+        angle_deg = -math.degrees(ellipse.angle)
+        transform = f'transform="rotate({angle_deg:.2f} {cx:.2f} {cy:.2f})"'
+
+        self.svg_elements.append(
+            f'<ellipse cx="{cx:.2f}" cy="{cy:.2f}" rx="{rx:.2f}" ry="{ry:.2f}" '
+            f'fill="none" stroke="black" stroke-width="{width}" {dash_attr} {transform}/>'
+        )
+
 
     def drawAxis(self):
         y_axis = self.transform_y(0)
@@ -338,6 +359,8 @@ class SVGExport:
                     self.drawLine(obj)
                 case Circle():
                     self.drawCircle(obj)
+                case Ellipse():
+                    self.drawEllipse(obj)
 
         self.save(filename)
 

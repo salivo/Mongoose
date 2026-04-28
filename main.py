@@ -54,7 +54,7 @@ class MainWindow(QMainWindow):
         layout.setContentsMargins(0, 0, 0, 0)
         self.init_objects_panel()
         self.init_menubar()
-        self.canvas = DrawingCanvas(project.objects)
+        self.canvas = DrawingCanvas(project.objects, project.settings)
         layout.addWidget(self.canvas)
         self.canvas.selection_changed.connect(self.sync_list_selection)
         self.canvas.resize_confirmed.connect(self.handle_resize_confirmed)
@@ -132,7 +132,14 @@ class MainWindow(QMainWindow):
                 if popup.exec():
                     project.push_state()
                     name = popup.name_input.text()
-                    distance_repr = popup.distance_input.repr_for_cmd()
+                    distance = popup.distance_input.get_value()
+                    if isinstance(distance, str):
+                        if distance in project.objects:
+                            distance_repr = repr(distance)
+                        else:
+                            distance_repr = distance
+                    else:
+                        distance_repr = str(distance)
                     element = project.add_new_commands(
                         f"createPerpFromPoint({repr(points[0])}, {repr(lines[0])}, {distance_repr}, {repr(name)})"
                     )
@@ -152,6 +159,25 @@ class MainWindow(QMainWindow):
                     radius_repr = popup.radius_input.repr_for_cmd()
                     element = project.add_new_commands(
                         f"createCircle({repr(points[0])}, {radius_repr}, {repr(name)})"
+                    )
+                    if element is not None:
+                        self.insert_object_to_sidepanel(element)
+                        self.object_list.update()
+                        self.canvas.update()
+        # --- createEllipse: O key (select 3 Points) ---
+        if a0.key() == Qt.Key.Key_O:
+            sel = self.canvas.selected_objs
+            points = [k for k in sel if isinstance(project.objects.get(k), Point)]
+            if len(points) == 3:
+                popup = NameOnlyPopup()
+                if popup.exec():
+                    project.push_state()
+                    name = popup.name_input.text()
+                    c = points[0]
+                    p1 = points[1]
+                    p2 = points[2]
+                    element = project.add_new_commands(
+                        f"createEllipse({repr(c)}, {repr(p1)}, {repr(p2)}, {repr(name)})"
                     )
                     if element is not None:
                         self.insert_object_to_sidepanel(element)
@@ -440,10 +466,17 @@ class MainWindow(QMainWindow):
             settings_action.triggered.connect(self.edit_settings_triggered)
             edit_menu.addAction(settings_action)
 
+        project_menu = menubar.addMenu("&Project")
+        if project_menu:
+            proj_settings_action = QAction("Project Settings…", self)
+            proj_settings_action.triggered.connect(self.project_settings_triggered)
+            project_menu.addAction(proj_settings_action)
+
     def file_new_triggered(self):
         if not self.maybe_save():
             return
         project.new()
+        self.canvas.settings = project.settings
         self.set_objects_panel()
         self.canvas.update()
 
@@ -457,6 +490,7 @@ class MainWindow(QMainWindow):
 
         if file_path:
             project.open(file_path)
+            self.canvas.settings = project.settings
             self.set_objects_panel()
 
     def file_save_triggered(self):
@@ -489,11 +523,11 @@ class MainWindow(QMainWindow):
         dlg.setWindowTitle("Export SVG")
         form = QFormLayout(dlg)
 
-        name_input = QLineEdit(project.project_name)
+        name_input = QLineEdit(project.settings.get("project_name", ""))
         name_input.setPlaceholderText("Project name (shown on page)")
         form.addRow("Project name:", name_input)
 
-        number_input = QLineEdit(project.work_number)
+        number_input = QLineEdit(project.settings.get("work_number", ""))
         number_input.setPlaceholderText("Work number / ID")
         form.addRow("Work number:", number_input)
 
@@ -507,9 +541,11 @@ class MainWindow(QMainWindow):
         if dlg.exec() != QDialog.DialogCode.Accepted:
             return
 
-        project.project_name = name_input.text().strip()
-        project.work_number = number_input.text().strip()
-        work_number = project.work_number
+        # Settings are now stored in project.settings
+        project.settings["project_name"] = name_input.text().strip()
+        project.settings["work_number"] = number_input.text().strip()
+        work_number = project.settings["work_number"]
+        project.is_dirty = True
 
         # Ask where to save
         default_dir = ""
@@ -529,12 +565,17 @@ class MainWindow(QMainWindow):
 
         # Build SVG export
         exporter = SVGExport()
-        exporter.set_workname(project.project_name)
+        exporter.set_workname(project.settings["project_name"])
 
         lastname = app_cfg.get("me", "lastname", fallback="Lastname")
         class_name = app_cfg.get("me", "class", fallback="4.X")
         exporter.set_lastname(lastname, class_name)
         exporter.set_id_date(work_number, date.today().strftime("%d.%m.%Y"))
+
+        # Apply project offset to export (convert units to mm)
+        off_x_mm = project.settings.get("offset_x", 0.0) * 10
+        off_y_mm = project.settings.get("offset_y", 0.0) * 10
+        exporter.set_offset(off_x_mm, off_y_mm)
 
         point_style = app_cfg.get("export", "point_style", fallback="dot")
         exporter.set_point_style(point_style)
@@ -598,6 +639,41 @@ class MainWindow(QMainWindow):
 
         save_config(app_cfg)
         QMessageBox.information(self, "Settings", "Settings saved.")
+
+    def project_settings_triggered(self):
+        dlg = QDialog(self)
+        dlg.setWindowTitle("Project Settings")
+        form = QFormLayout(dlg)
+
+        name_input = QLineEdit(project.settings.get("project_name", ""))
+        form.addRow("Project Name:", name_input)
+
+        number_input = QLineEdit(project.settings.get("work_number", ""))
+        form.addRow("Work Number:", number_input)
+
+        off_x_input = QLineEdit(str(project.settings.get("offset_x", 0.0)))
+        form.addRow("Offset X (units):", off_x_input)
+
+        off_y_input = QLineEdit(str(project.settings.get("offset_y", 0.0)))
+        form.addRow("Offset Y (units):", off_y_input)
+
+        buttons = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
+        )
+        buttons.accepted.connect(dlg.accept)
+        buttons.rejected.connect(dlg.reject)
+        form.addRow(buttons)
+
+        if dlg.exec() == QDialog.DialogCode.Accepted:
+            project.settings["project_name"] = name_input.text().strip()
+            project.settings["work_number"] = number_input.text().strip()
+            try:
+                project.settings["offset_x"] = float(off_x_input.text())
+                project.settings["offset_y"] = float(off_y_input.text())
+            except ValueError:
+                pass
+            project.is_dirty = True
+            self.canvas.update()
 
     def maybe_save(self) -> bool:
         if not project.is_dirty:
@@ -672,6 +748,7 @@ class MainWindow(QMainWindow):
     def insert_object_to_sidepanel(self, element):
         item = QListWidgetItem()
         row_widget = ObjectPreviewWidget(element.content, self.object_list)
+        row_widget.edit_requested.connect(lambda: self.edit_history_item(element.id))
         item.setSizeHint(row_widget.sizeHint())
         item.setData(Qt.ItemDataRole.UserRole, element.id)
         self.object_list.setStyleSheet("""
@@ -690,6 +767,156 @@ class MainWindow(QMainWindow):
         index = self.object_list.count() - 1
         self.object_list.insertItem(index, item)
         self.object_list.setItemWidget(item, row_widget)
+
+    def edit_history_item(self, element_id):
+        el = next((e for e in project.history if e.id == element_id), None)
+        if not el: return
+
+        if el.cmd == "createPoint":
+            coords, name = el.args
+            popup = PointSetParamsPopup(self)
+            popup.x_input.setText(str(coords[0]))
+            if coords[1] is None: popup.y_input.set_null(True)
+            else: popup.y_input.setText(str(coords[1]))
+            if coords[2] is None: popup.z_input.set_null(True)
+            else: popup.z_input.setText(str(coords[2]))
+            popup.name_input.setText(name)
+            
+            if popup.exec():
+                project.push_state()
+                x_repr = popup.x_input.repr_for_cmd()
+                y_repr = popup.y_input.repr_for_cmd()
+                z_repr = popup.z_input.repr_for_cmd()
+                new_name = popup.name_input.text()
+                new_cmd = f"createPoint(({x_repr}, {y_repr}, {z_repr}), {repr(new_name)})"
+                project.modify_element(element_id, new_cmd)
+                self.set_objects_panel()
+                self.canvas.update()
+
+        elif el.cmd == "createLine":
+            p1, p2, name = el.args
+            popup = LineSetParamsPopup(self)
+            popup.name_input.setText(name)
+            if popup.exec():
+                project.push_state()
+                new_name = popup.name_input.text()
+                new_cmd = f"createLine({repr(p1)}, {repr(p2)}, {repr(new_name)})"
+                project.modify_element(element_id, new_cmd)
+                self.set_objects_panel()
+                self.canvas.update()
+        
+        elif el.cmd == "createCircle":
+            p, r, name = el.args
+            popup = CreateCirclePopup(self)
+            popup.name_input.setText(name)
+            popup.radius_input.setText(str(r))
+            if popup.exec():
+                project.push_state()
+                r_repr = popup.radius_input.repr_for_cmd()
+                new_name = popup.name_input.text()
+                new_cmd = f"createCircle({repr(p)}, {r_repr}, {repr(new_name)})"
+                project.modify_element(element_id, new_cmd)
+                self.set_objects_panel()
+                self.canvas.update()
+
+        elif el.cmd == "createEllipse":
+            c, p1, p2, name = el.args
+            popup = NameOnlyPopup(self)
+            popup.name_input.setText(name)
+            if popup.exec():
+                project.push_state()
+                new_name = popup.name_input.text()
+                new_cmd = f"createEllipse({repr(c)}, {repr(p1)}, {repr(p2)}, {repr(new_name)})"
+                project.modify_element(element_id, new_cmd)
+                self.set_objects_panel()
+                self.canvas.update()
+
+        elif el.cmd == "createPlane":
+            coords, name = el.args
+            popup = CreatePlanePopup(self)
+            popup.x_input.setText(str(coords[0]))
+            # Restore y1/y2 values
+            if isinstance(coords[1], str):
+                popup.y1_input.setText(coords[1])
+            else:
+                popup.y1_input.setText(str(coords[1]))
+            if isinstance(coords[2], str):
+                popup.y2_input.setText(coords[2])
+            else:
+                popup.y2_input.setText(str(coords[2]))
+            popup.name_input.setText(name)
+            if popup.exec():
+                project.push_state()
+                new_name = popup.name_input.text()
+                new_coords = popup.get_coords()
+                x, y1, y2 = new_coords
+                x_repr = popup.x_input.repr_for_cmd()
+                y1_repr = repr(y1) if isinstance(y1, str) else str(y1)
+                y2_repr = repr(y2) if isinstance(y2, str) else str(y2)
+                new_cmd = f"createPlane(({x_repr}, {y1_repr}, {y2_repr}), {repr(new_name)})"
+                project.modify_element(element_id, new_cmd)
+                self.set_objects_panel()
+                self.canvas.update()
+
+        elif el.cmd == "createPerpFromPoint":
+            pt, ln, dist, name = el.args
+            popup = PerpFromPointPopup(self)
+            popup.name_input.setText(name)
+            popup.distance_input.setText(str(dist))
+            if popup.exec():
+                project.push_state()
+                new_name = popup.name_input.text()
+                d_repr = popup.distance_input.repr_for_cmd()
+                new_cmd = f"createPerpFromPoint({repr(pt)}, {repr(ln)}, {d_repr}, {repr(new_name)})"
+                project.modify_element(element_id, new_cmd)
+                self.set_objects_panel()
+                self.canvas.update()
+
+        elif el.cmd == "parallel":
+            pt, ln, offset, name = el.args
+            popup = ParallelPopup(self)
+            popup.name_input.setText(name)
+            popup.offset_input.setText(str(offset))
+            if popup.exec():
+                project.push_state()
+                new_name = popup.name_input.text()
+                offset_text = popup.offset_input.text().strip()
+                try:
+                    offset_val = float(offset_text)
+                    offset_repr = str(offset_val)
+                except ValueError:
+                    if offset_text in project.objects:
+                        offset_repr = repr(offset_text)
+                    else:
+                        offset_repr = offset_text
+                new_cmd = f"parallel({repr(pt)}, {repr(ln)}, {offset_repr}, {repr(new_name)})"
+                project.modify_element(element_id, new_cmd)
+                self.set_objects_panel()
+                self.canvas.update()
+
+        else:
+            # Generic fallback: show raw source for editing
+            dlg = QDialog(self)
+            dlg.setWindowTitle(f"Edit: {el.cmd}")
+            form = QFormLayout(dlg)
+            
+            src_input = QLineEdit(el.source or "")
+            form.addRow("Command:", src_input)
+            
+            buttons = QDialogButtonBox(
+                QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
+            )
+            buttons.accepted.connect(dlg.accept)
+            buttons.rejected.connect(dlg.reject)
+            form.addRow(buttons)
+            
+            if dlg.exec() == QDialog.DialogCode.Accepted:
+                new_src = src_input.text().strip()
+                if new_src and new_src != el.source:
+                    project.push_state()
+                    project.modify_element(element_id, new_src)
+                    self.set_objects_panel()
+                    self.canvas.update()
 
     def handle_new_command(self):
         raw_text = self.input_field.text().strip()

@@ -36,8 +36,12 @@ class Project:
         self.variables = {}
         self.next_id = 2
         self.is_dirty = False
-        self.project_name = ""
-        self.work_number = ""
+        self.settings = {
+            "project_name": "",
+            "work_number": "",
+            "offset_x": 0.0,
+            "offset_y": 0.0
+        }
         self.objects["org_x"] = create_objects.org_x
         self.objects["org_y"] = create_objects.org_y
 
@@ -46,17 +50,22 @@ class Project:
         self.document.open(filepath)
         if self.document.file is None:
             return
-        # Parse project_name and work_number from magic comments at top of file
-        self.project_name = ""
-        self.work_number = ""
+        # Parse settings from magic comments
         lines = self.document.file.split("\n")
         script_lines = []
+        import json
         for line in lines:
             stripped = line.strip()
-            if stripped.startswith("# project_name:"):
-                self.project_name = stripped[len("# project_name:"):].strip()
+            if stripped.startswith("# settings ="):
+                try:
+                    data = json.loads(stripped[len("# settings ="):].strip())
+                    self.settings.update(data)
+                except:
+                    pass
+            elif stripped.startswith("# project_name:"):
+                self.settings["project_name"] = stripped[len("# project_name:"):].strip()
             elif stripped.startswith("# work_number:"):
-                self.work_number = stripped[len("# work_number:"):].strip()
+                self.settings["work_number"] = stripped[len("# work_number:"):].strip()
             else:
                 script_lines.append(line)
         self.add_new_commands("\n".join(script_lines))
@@ -66,8 +75,12 @@ class Project:
 
     def new(self):
         self.is_dirty = False
-        self.project_name = ""
-        self.work_number = ""
+        self.settings = {
+            "project_name": "",
+            "work_number": "",
+            "offset_x": 0.0,
+            "offset_y": 0.0
+        }
         self.document.new()
         self.history.clear()
         self.undo_stack.clear()
@@ -285,11 +298,9 @@ class Project:
             script_lines.insert(0, f"visibilities = {vis_str}")
             script_lines.append("setVisibilities(visibilities)")
 
-        # Prepend project name and work number as magic comments
-        if self.work_number:
-            script_lines.insert(0, f"# work_number: {self.work_number}")
-        if self.project_name:
-            script_lines.insert(0, f"# project_name: {self.project_name}")
+        # Prepend settings as a magic comment
+        settings_json = json.dumps(self.settings)
+        script_lines.insert(0, f"# settings = {settings_json}")
 
         self.document.file = "\n".join(script_lines)
         self.document.save()
@@ -330,6 +341,14 @@ def gen_content_from_args(id, cmd, args):
                 ObjectTypes.CIRCLE,
                 "normal",
                 f"c={args[0]}, r={args[1]}",
+                id,
+            )
+        case "createEllipse":
+            return ObjectPreviewType(
+                args[3],
+                ObjectTypes.ELLIPSE,
+                "normal",
+                f"c={args[0]}, p1={args[1]}, p2={args[2]}",
                 id,
             )
         case "createSplitSegment":

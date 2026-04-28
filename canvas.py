@@ -5,7 +5,7 @@ from PyQt6.QtCore import QPointF, Qt, pyqtSignal
 from PyQt6.QtGui import QColor, QPainter, QPen, QWheelEvent
 from PyQt6.QtWidgets import QWidget
 
-from geometry_math import Circle, Line, Point
+from geometry_math import Circle, Ellipse, Line, Point
 
 style = {"normal": 0.2, "bold": 0.6}
 type = {
@@ -20,8 +20,9 @@ class DrawingCanvas(QWidget):
     selection_changed = pyqtSignal(list)
     resize_confirmed = pyqtSignal(str, float, float)
 
-    def __init__(self, objects):
+    def __init__(self, objects, settings=None):
         super().__init__()
+        self.settings = settings if settings is not None else {}
         self.setMinimumSize(400, 300)
         self.zoom = 0.2
         self.offset = QPointF(0.0, 0.0)
@@ -187,6 +188,22 @@ class DrawingCanvas(QWidget):
                             dist = float("inf")
                     else:
                         dist = dist_to_edge
+            elif isinstance(obj, Ellipse):
+                # Transform mouse point to ellipse local coordinates (unrotated)
+                dx = px - obj.center.x
+                dy = py - obj.center.y
+                cos_a = math.cos(-obj.angle)
+                sin_a = math.sin(-obj.angle)
+                lx = dx * cos_a - dy * sin_a
+                ly = dx * sin_a + dy * cos_a
+                
+                # Simple approximation: normalized distance to edge
+                if obj.a > 0 and obj.b > 0:
+                    norm_dist = math.sqrt((lx / obj.a)**2 + (ly / obj.b)**2)
+                    # Scale normalized distance back to coordinate units
+                    dist = abs(norm_dist - 1.0) * ((obj.a + obj.b) / 2.0)
+                else:
+                    dist = float("inf")
 
             if dist <= hit_threshold and dist < best_dist:
                 best_match = key
@@ -229,30 +246,66 @@ class DrawingCanvas(QWidget):
             int(self.paper_h),
         )
 
+        # Apply project offset (from settings)
+        # settings['offset_x/y'] are in coordinate units, convert to pixels
+        off_x = self.settings.get('offset_x', 0.0) * self.scale * self.mm_to_px
+        off_y = self.settings.get('offset_y', 0.0) * self.scale * self.mm_to_px
+        painter.translate(off_x, -off_y) # Y is inverted in our coordinate system
+
         # Draw all objects
         self.draw_objects(painter)
 
     def draw_objects(self, painter: QPainter):
+        hovered_obj_data = None
+        
+        # First pass: Lines and Circles
         for key, obj in self.objects.items():
-            # Skip invisible objects from rendering (but never skip axes)
             if (hasattr(obj, 'type') and obj.type == 'none' or getattr(obj, 'hidden', False)) and getattr(obj, 'name', '') not in ('org_x', 'org_y'):
                 continue
-            is_hovered = key == self.hovered_obj or key in self.selected_objs
+            is_selected = key == self.hovered_obj or key in self.selected_objs
+            if key == self.hovered_obj:
+                hovered_obj_data = obj
+
             if isinstance(obj, Line):
                 if obj.name in ("org_x", "org_y"):
-                    self.draw_axis(painter, obj, is_hovered)
+                    self.draw_axis(painter, obj, is_selected)
                 else:
-                    self.draw_line(painter, obj, is_hovered)
+                    self.draw_line(painter, obj, is_selected)
             elif isinstance(obj, Circle):
-                self.draw_circle(painter, obj, is_hovered)
+                self.draw_circle(painter, obj, is_selected)
+            elif isinstance(obj, Ellipse):
+                self.draw_ellipse(painter, obj, is_selected)
 
+        # Second pass: Points on top
         for key, obj in self.objects.items():
-            # Skip invisible objects from rendering (but never skip axes)
             if (hasattr(obj, 'type') and obj.type == 'none' or getattr(obj, 'hidden', False)) and getattr(obj, 'name', '') not in ('org_x', 'org_y'):
                 continue
-            is_hovered = key == self.hovered_obj or key in self.selected_objs
+            is_selected = key == self.hovered_obj or key in self.selected_objs
             if isinstance(obj, Point):
-                self.draw_point(painter, obj, is_hovered)
+                self.draw_point(painter, obj, is_selected)
+
+        # Draw tooltip for hovered object near mouse (skip points as they have persistent names)
+        if hovered_obj_data and not isinstance(hovered_obj_data, Point) and self.last_mouse_widget_pos and hovered_obj_data.name not in ("org_x", "org_y"):
+            painter.save()
+            painter.resetTransform()
+            
+            name_text = hovered_obj_data.name
+            font = painter.font()
+            font.setPointSize(10)
+            painter.setFont(font)
+            fm = painter.fontMetrics()
+            padding = 4
+            text_rect = fm.boundingRect(name_text)
+            bg_rect = text_rect.adjusted(-padding, -padding, padding, padding)
+            bg_rect.moveTo(int(self.last_mouse_widget_pos.x()) + 15, int(self.last_mouse_widget_pos.y()) - 15)
+            
+            painter.setPen(Qt.PenStyle.NoPen)
+            painter.setBrush(QColor(0, 0, 0, 180)) 
+            painter.drawRoundedRect(bg_rect, 3, 3)
+            
+            painter.setPen(QColor(255, 255, 255))
+            painter.drawText(bg_rect, Qt.AlignmentFlag.AlignCenter, name_text)
+            painter.restore()
 
         # Draw resize mode preview overlay
         if self.resize_mode and self.resize_line_key:
@@ -307,8 +360,8 @@ class DrawingCanvas(QWidget):
             -point.y * self.scale * self.mm_to_px,
         )
         painter.drawPoint(pt)
-
-        # Draw point name
+        
+        # Draw point name persistently
         mapped = painter.transform().map(pt)
         painter.save()
         painter.resetTransform()
@@ -339,17 +392,6 @@ class DrawingCanvas(QWidget):
             -int((line.p1.y + r2 * dy) * sc),
         )
 
-        if is_hovered and self.last_mouse_widget_pos and line.name not in ("org_x", "org_y"):
-            painter.save()
-            painter.resetTransform()
-            text_pen = QPen(QColor(255, 165, 0))
-            painter.setPen(text_pen)
-            font = painter.font()
-            font.setPointSize(10)
-            painter.setFont(font)
-            painter.drawText(self.last_mouse_widget_pos + QPointF(10, -10), line.name)
-            painter.restore()
-
     def draw_circle(self, painter: QPainter, circle: Circle, is_hovered: bool):
         color = QColor(255, 165, 0) if is_hovered else QColor(0, 0, 0)
         thickness = style[circle.style] + 0.2 if is_hovered else style[circle.style]
@@ -372,20 +414,38 @@ class DrawingCanvas(QWidget):
             int(span),
         )
 
-        if is_hovered and self.last_mouse_widget_pos:
-            painter.save()
-            painter.resetTransform()
-            text_pen = QPen(QColor(255, 165, 0))
-            painter.setPen(text_pen)
-            font = painter.font()
-            font.setPointSize(10)
-            painter.setFont(font)
-            painter.drawText(self.last_mouse_widget_pos + QPointF(10, -10), circle.name)
-            painter.restore()
+    def draw_ellipse(self, painter: QPainter, ellipse: Ellipse, is_hovered: bool):
+        color = QColor(255, 165, 0) if is_hovered else QColor(0, 0, 0)
+        thickness = style[ellipse.style] + 0.2 if is_hovered else style[ellipse.style]
+        pen = QPen(color, thickness * self.mm_to_px)
+        pen.setStyle(type[ellipse.type])
+        pen.setCapStyle(Qt.PenCapStyle.RoundCap)
+        painter.setPen(pen)
+        
+        painter.save()
+        cx = ellipse.center.x * self.scale * self.mm_to_px
+        cy = -ellipse.center.y * self.scale * self.mm_to_px
+        painter.translate(cx, cy)
+        painter.rotate(-math.degrees(ellipse.angle))
+        
+        a = ellipse.a * self.scale * self.mm_to_px
+        b = ellipse.b * self.scale * self.mm_to_px
+        
+        painter.drawEllipse(QPointF(0, 0), a, b)
+        painter.restore()
 
     def map_to_logical(self, pos: QPointF) -> QPointF:
         center_x = self.width() / 2 + self.offset.x()
         center_y = self.height() / 2 + self.offset.y()
+        
+        # Add project offset to the center for reverse mapping
+        # Note: off_y is subtracted because logical Y is inverted
+        off_x = self.settings.get('offset_x', 0.0) * self.scale * self.mm_to_px
+        off_y = self.settings.get('offset_y', 0.0) * self.scale * self.mm_to_px
+        
+        center_x += off_x * self.zoom
+        center_y -= off_y * self.zoom # Y is inverted
+
         # Reverse translation and zoom
         logical_x = (pos.x() - center_x) / self.zoom
         logical_y = -(pos.y() - center_y) / self.zoom

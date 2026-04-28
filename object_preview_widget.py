@@ -1,7 +1,7 @@
 from enum import Enum
 from tkinter import Variable
 
-from PyQt6.QtCore import QRectF, Qt
+from PyQt6.QtCore import QRectF, Qt, pyqtSignal
 from PyQt6.QtGui import QGuiApplication, QPainter, QPixmap
 from PyQt6.QtSvg import QSvgRenderer
 from PyQt6.QtWidgets import (
@@ -21,6 +21,7 @@ class ObjectTypes(Enum):
     LINE = "Line"
     PLANE = "Plane"
     CIRCLE = "Circle"
+    ELLIPSE = "Ellipse"
     VARIABLE = "Variable"
     UNKNOWN = "Unknown"
 
@@ -30,6 +31,7 @@ icons = {
     ObjectTypes.LINE: "line.svg",
     ObjectTypes.PLANE: "plane.svg",
     ObjectTypes.CIRCLE: "circle.svg",
+    ObjectTypes.ELLIPSE: "circle.svg",
     ObjectTypes.VARIABLE: "variable.svg",
 }
 
@@ -46,6 +48,8 @@ class ObjectPreviewType:
 
 
 class ObjectPreviewWidget(QWidget):
+    edit_requested = pyqtSignal()
+
     def __init__(
         self,
         content: ObjectPreviewType,
@@ -119,7 +123,7 @@ class ObjectPreviewWidget(QWidget):
         layout.addWidget(self.value_input)
 
     def on_menu_click(self):
-        print(f"Opening settings for {self.content.id}")
+        self.edit_requested.emit()
 
 
 def get_icon(icon_name, size=24):

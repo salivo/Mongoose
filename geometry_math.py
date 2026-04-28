@@ -43,6 +43,31 @@ class Circle:
         self.style: str = "normal"
 
 
+class Ellipse:
+    def __init__(
+        self,
+        id: int,
+        center: Point,
+        a_point: Point,
+        b_length: float,
+        name: str,
+    ):
+        self.id = id
+        self.center: Point = center
+        self.a_point: Point = a_point
+        self.name: str = name
+        
+        # Calculate semi-major axis 'a' and rotation angle
+        dx = a_point.x - center.x
+        dy = a_point.y - center.y
+        self.a: float = sqrt(dx**2 + dy**2)
+        self.b: float = b_length
+        self.angle: float = atan2(dy, dx)
+        
+        self.type: str = "construct"
+        self.style: str = "normal"
+
+
 class Plane:
     def __init__(
         self, id: int, cords: tuple[float, float | str, float | str], name: str
