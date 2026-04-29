@@ -71,6 +71,7 @@ python main.py tests/4_perpendicular.mgs
 | **P** | **Create Point** | None (Prompts for coords) |
 | **L** | **Create Line** | 2 Points |
 | **C** | **Create Circle** | 1 Point (Center) |
+| **O** | **Create Ellipse** | 3 Points (Center, Major Axis, Point on Ellipse) |
 | **N** | **Create Plane** | None (Prompts for coords) |
 | **S** | **Split Line** | 1 Line + 1+ cutting points/lines |
 | **I** | **Intersect** | 2 Objects (Line/Circle/Plane) |

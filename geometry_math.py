@@ -49,20 +49,40 @@ class Ellipse:
         id: int,
         center: Point,
         a_point: Point,
-        b_length: float,
+        on_point: Point,
         name: str,
     ):
         self.id = id
         self.center: Point = center
         self.a_point: Point = a_point
+        self.on_point: Point = on_point
         self.name: str = name
         
         # Calculate semi-major axis 'a' and rotation angle
         dx = a_point.x - center.x
         dy = a_point.y - center.y
         self.a: float = sqrt(dx**2 + dy**2)
-        self.b: float = b_length
         self.angle: float = atan2(dy, dx)
+        
+        # Transform on_point to ellipse-local coordinates (unrotated, centered)
+        ox = on_point.x - center.x
+        oy = on_point.y - center.y
+        cos_a = math.cos(-self.angle)
+        sin_a = math.sin(-self.angle)
+        lx = ox * cos_a - oy * sin_a  # local x (along major axis)
+        ly = ox * sin_a + oy * cos_a  # local y (along minor axis)
+        
+        # Solve (lx/a)^2 + (ly/b)^2 = 1 for b
+        # b^2 = ly^2 / (1 - (lx/a)^2)
+        if self.a > 0:
+            ratio = (lx / self.a) ** 2
+            if ratio < 1.0 and abs(ly) > 1e-12:
+                self.b: float = abs(ly) / sqrt(1.0 - ratio)
+            else:
+                # Point is on the major axis or beyond it, fallback to distance
+                self.b = abs(ly) if abs(ly) > 1e-12 else self.a * 0.5
+        else:
+            self.b = 0.0
         
         self.type: str = "construct"
         self.style: str = "normal"

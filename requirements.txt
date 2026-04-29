@@ -1,2 +1,4 @@
 watchdog
 matplotlib
+pyqt6
+typing_extensions

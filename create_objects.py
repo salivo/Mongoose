@@ -76,16 +76,11 @@ def createCircle(id, objects, p_name: str, radius: float, name: str):
 
 
 def createEllipse(id, objects, center_name: str, p1_name: str, p2_name: str, name: str):
-    import math
     c = objects.get(center_name)
     p1 = objects.get(p1_name)
     p2 = objects.get(p2_name)
     if isinstance(c, Point) and isinstance(p1, Point) and isinstance(p2, Point):
-        # Calculate b length from p2 (distance from center)
-        dx = p2.x - c.x
-        dy = p2.y - c.y
-        b = math.sqrt(dx**2 + dy**2)
-        ellipse = Ellipse(id, c, p1, b, name)
+        ellipse = Ellipse(id, c, p1, p2, name)
         objects[name] = ellipse
 
 

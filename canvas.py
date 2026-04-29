@@ -63,11 +63,6 @@ class DrawingCanvas(QWidget):
         if delta == 0:
             return
 
-        # On Linux, touchpads usually emit pixelDelta() whereas normal mice do not.
-        # We invert the delta if pixelDelta is present (indicating a touchpad).
-        if not a0.pixelDelta().isNull():
-            delta = -delta
-
         # A standard mouse wheel step is 120. For touchpads, the delta is smaller but more frequent.
         # Scale the zoom factor proportionally to the delta for smooth zooming on all devices.
         factor = (self.zoom_in_factor) ** (delta / 120.0)
