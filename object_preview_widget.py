@@ -126,10 +126,20 @@ class ObjectPreviewWidget(QWidget):
         self.edit_requested.emit()
 
 
+def _get_base_path():
+    """Get base path for resource files (works both dev and PyInstaller bundle)."""
+    import sys, os
+    if getattr(sys, 'frozen', False):
+        return sys._MEIPASS
+    return os.path.dirname(os.path.abspath(__file__))
+
+
 def get_icon(icon_name, size=24):
+    import os
     try:
         svg_path = icons[icon_name]
-        with open("static/icons/" + svg_path, "r") as f:
+        full_path = os.path.join(_get_base_path(), "static", "icons", svg_path)
+        with open(full_path, "r") as f:
             svg_data = f.read()
         dpr = QGuiApplication.primaryScreen().devicePixelRatio()
         pixmap = QPixmap(int(size * dpr), int(size * dpr))
