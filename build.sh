@@ -2,7 +2,8 @@
 # Build Mongoose as a standalone executable (Linux)
 # For Windows, run: python build.py
 
-echo "Installing PyInstaller..."
+echo "Installing dependencies..."
+pip install -r requirements.txt
 pip install pyinstaller
 
 echo "Building Mongoose..."

@@ -5,10 +5,13 @@ Usage: python build.py
 import subprocess
 import sys
 
-# Install pyinstaller if not present
+# Install requirements and pyinstaller
+print("Installing dependencies...")
+subprocess.check_call([sys.executable, "-m", "pip", "install", "-r", "requirements.txt"])
 subprocess.check_call([sys.executable, "-m", "pip", "install", "pyinstaller"])
 
 # Build
+print("Building executable...")
 subprocess.check_call([sys.executable, "-m", "PyInstaller", "mongoose.spec", "--clean"])
 
 print("\nBuild complete!")

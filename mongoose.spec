@@ -1,26 +1,34 @@
 # -*- mode: python ; coding: utf-8 -*-
 # PyInstaller spec file for Mongoose
 # Works on both Windows and Linux.
-# Usage: pyinstaller mongoose.spec
+# Usage: pyinstaller mongoose.spec --clean
 
 import sys
 import os
+from PyInstaller.utils.hooks import collect_all
 
 block_cipher = None
 
+# Collect ALL PyQt6 files (binaries, data, hidden imports)
+qt_datas, qt_binaries, qt_hiddenimports = collect_all('PyQt6')
+
 a = Analysis(
     ['main.py'],
-    pathex=[],
-    binaries=[],
+    pathex=['.'],
+    binaries=qt_binaries,
     datas=[
         ('static/icons/*.svg', 'static/icons'),
-    ],
+    ] + qt_datas,
     hiddenimports=[
-        'PyQt6.QtSvg',
+        'PyQt6',
         'PyQt6.QtCore',
         'PyQt6.QtGui',
         'PyQt6.QtWidgets',
-    ],
+        'PyQt6.QtSvg',
+        'PyQt6.sip',
+        'numpy',
+        'typing_extensions',
+    ] + qt_hiddenimports,
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
@@ -46,7 +54,7 @@ exe = EXE(
     upx=True,
     upx_exclude=[],
     runtime_tmpdir=None,
-    console=False,  # No terminal window (GUI app)
+    console=True,   # Set to True so you can see errors; change to False for release
     disable_windowed_traceback=False,
     argv_emulation=False,
     target_arch=None,
