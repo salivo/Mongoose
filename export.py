@@ -75,7 +75,7 @@ class SVGExport:
         # Direct mm conversion: 1 coordinate unit = 10mm
         y_mm = y * self.mm_per_unit
         # Center vertically on A4, invert Y axis
-        return self.height / 2 - y_mm + self.offset_y
+        return self.height / 2 - y_mm - self.offset_y
 
     def transform_length(self, length):
         """Transform a length value to SVG scale"""
